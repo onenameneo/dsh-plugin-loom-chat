@@ -1,0 +1,4 @@
+# Mount Loom Chat as an opt-in Web profile bundle.
+- insert:
+    - id: loom-chat
+      name: 'dsh-loom-chat'

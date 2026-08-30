@@ -1,0 +1,126 @@
+{
+  "name": "dsh-loom-chat",
+  "description": "Interact with branched DSH sessions as live windows on a Loom-style canvas",
+  "version": "0.1.0-rc.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onenameneo/dsh-plugin-loom-chat.git"
+  },
+  "homepage": "https://github.com/onenameneo/dsh-plugin-loom-chat",
+  "bugs": {
+    "url": "https://github.com/onenameneo/dsh-plugin-loom-chat/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-primitives",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-attachment",
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-model-selection",
+        "@deepseek-ai/dsh-session-stats",
+        "@deepseek-ai/dsh-token-meter",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale"
+      ],
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "packageManager": "pnpm@11.7.0",
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && tsdown --config tsdown.config.ts",
+    "dev": "tsdown --config tsdown.config.ts --watch",
+    "test": "vitest run",
+    "pack:verify": "pnpm pack --pack-destination ./.artifacts",
+    "prepare": "pnpm run build"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-locale": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-attachment": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-input-trigger": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-model-selection": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-session-stats": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-token-meter": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-layout": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-primitives": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-invariants": "^0.1.0-rc.7",
+    "react": ">=18.2.0 <20.0.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.1",
+    "@deepseek-ai/dsh-api-remotes": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-conversation": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-attachment": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-input-trigger": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-model-selection": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-session-stats": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-token-meter": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-layout": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-primitives": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.7",
+    "@deepseek-ai/dsh-invariants": "0.1.0-rc.7",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.20.0",
+    "@types/react": "^18.3.28",
+    "@types/react-dom": "^18.3.7",
+    "jsdom": "^29.1.1",
+    "lightningcss": "^1.32.0",
+    "react": "18.3.1",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ]
+}

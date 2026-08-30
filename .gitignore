@@ -1,0 +1,8 @@
+node_modules/
+lib/
+.artifacts/
+*.tsbuildinfo
+.claude
+.codex
+.loom
+openspec
