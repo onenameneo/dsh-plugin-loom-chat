@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 interface PackageManifest {
+  files?: string[]
   types?: string
   exports?: {
     '.': {
@@ -50,5 +51,11 @@ describe('published package manifest', () => {
 
     expect(manifest.scripts?.prepare).toBe('pnpm run build')
     expect(manifest.scripts?.['pack:verify']).toBe('pnpm pack --pack-destination ./.artifacts')
+  })
+
+  it('ships README assets referenced by the npm package page', async () => {
+    const manifest = await readJson<PackageManifest>('package.json')
+
+    expect(manifest.files).toContain('assetes')
   })
 })

@@ -236,7 +236,7 @@ function textFromUserNode(node: unknown): string {
 
 function firstUserPromptAfter(session: SessionFace, atSeq: number): string | undefined {
   const snapshot = session.getSnapshot()
-  const chat = snapshot.chat
+  const chat = snapshot?.chat
   if (chat === undefined || !Array.isArray(chat.order) || chat.nodes === undefined) return undefined
   for (const key of chat.order) {
     const node = chat.nodes.get(key)
@@ -377,7 +377,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       const input = this.inputFor?.(sessionId)
       if (input === undefined || input.submit === undefined) throw new Error(`session ${sessionId} composer is unavailable`)
       const presentation = this.presentations.get(sessionId)
-      const draft = text ?? input.state?.getSnapshot().draft ?? ''
+      const draft = text ?? input.state?.getSnapshot()?.draft ?? ''
       const userPrompt = draft.trim()
       if (presentation?.branchPrompt !== undefined && !presentation.branchContinued) {
         const selectedPrompt = buildSelectionPrompt(presentation.branchPrompt)
@@ -631,7 +631,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       text: selection.toString(),
       flowKey,
       flowKind,
-      node: flowKey === undefined ? undefined : session?.getSnapshot().chat?.nodes?.get(flowKey),
+      node: flowKey === undefined ? undefined : session?.getSnapshot()?.chat?.nodes?.get(flowKey),
     })
     this.selectionTarget = target
     this.selectionRect = target === null ? null : this.rectOf(range)
@@ -730,7 +730,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       if (presentation !== undefined && !presentation.branchContinued) {
         let presentationChanged = false
         const snapshot = session?.getSnapshot()
-        const inputPhase = input?.state?.getSnapshot().phase
+        const inputPhase = input?.state?.getSnapshot()?.phase
         if (!presentation.branchBoundaryResolved
           && snapshot?.openState === 'open'
           && snapshot.running === false
@@ -840,8 +840,8 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     input: LoomSessionInput | undefined,
     branchAtSeq: number,
   ): boolean {
-    if (session?.getSnapshot().running === true) return true
-    const inputPhase = input?.state?.getSnapshot().phase
+    if (session?.getSnapshot()?.running === true) return true
+    const inputPhase = input?.state?.getSnapshot()?.phase
     if (inputPhase !== undefined && inputPhase !== 'plain') return true
     const snapshot = session?.getSnapshot()
     if (snapshot === undefined) return false

@@ -128,6 +128,27 @@ describe('CanvasSessionWindow', () => {
     expect(open).toHaveBeenCalledOnce()
   })
 
+  it('keeps rendering safe while a detached session snapshot is unavailable', () => {
+    const base = windowSnapshot().session as never as {
+      getSnapshot: () => unknown
+      open: () => Promise<void>
+    }
+    expect(() => render(
+      <CanvasSessionWindow
+        window={windowSnapshot({
+          session: { ...base, getSnapshot: () => undefined } as never,
+        })}
+        onSelect={vi.fn()}
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+        onDraft={vi.fn()}
+        onSend={vi.fn()}
+        onCancel={vi.fn()}
+        t={t}
+      />,
+    )).not.toThrow()
+  })
+
   it('shows stop for a running window and does not expose a send action', () => {
     const ui = render(
       <CanvasSessionWindow

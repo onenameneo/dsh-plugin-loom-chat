@@ -84,7 +84,7 @@ export function CanvasSessionWindow({
   useEffect(() => {
     const session = window.session as DetachedSession | undefined
     const open = session?.open
-    if (session === undefined || session.getSnapshot().openState === 'open' || open === undefined) return
+    if (session === undefined || session.getSnapshot()?.openState === 'open' || open === undefined) return
     void open.call(session)
   }, [window.session])
   const inputState = window.inputState ?? window.input?.state?.getSnapshot()

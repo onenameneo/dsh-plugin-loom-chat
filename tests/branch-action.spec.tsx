@@ -36,6 +36,12 @@ const useSession = (select: (value: never) => unknown) => select({
 } as never)
 
 const useUninitializedSession = (select: (value: never) => unknown) => select({} as never)
+const useChatSnapshot = (select: (value: never) => unknown) => select({
+  chat: { nodes: { values: () => [{
+    kind: 'assistant-step',
+    data: { finalNode: { messageId: 'message-1', seq: 11 } },
+  }] } },
+} as never)
 
 describe('LoomBranchAction', () => {
   it('renders beside the ordinary branch action and forks the addressed message into Loom', () => {
@@ -108,5 +114,30 @@ describe('LoomBranchAction', () => {
     )
 
     expect(ui.queryByRole('button', { name: 'Branch into Loom Chat' })).toBeNull()
+  })
+
+  it('reads assistant nodes from the current Chat snapshot when legacy nodes are absent', () => {
+    const forkAt = vi.fn(async () => {})
+    const ui = render(
+      <LoomBranchAction
+        sessionId={'main' as SessionId}
+        messageId={'message-1' as never}
+        useSession={useChatSnapshot as never}
+        useProjection={neverHook}
+        useInput={neverHook}
+        inputActions={neverHook}
+        useSessions={neverHook}
+        useWorkspaces={neverHook}
+        useLoom={select => select(snapshot([{
+          id: 'main' as SessionId, title: 'Main', parentId: undefined, depth: 0, x: 0, y: 0,
+          running: false, pending: false, completed: false, blank: false, updatedAt: 0,
+          selected: true, canBranch: true, error: null,
+        }]))}
+        forkAt={forkAt}
+        t={t}
+      />,
+    )
+
+    expect(ui.getByRole('button', { name: 'Branch into Loom Chat' })).toBeTruthy()
   })
 })

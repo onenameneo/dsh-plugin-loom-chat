@@ -52,7 +52,7 @@ describe('session graph', () => {
 
     expect(graph.nodes.map(node => node.id).sort()).toEqual(['a', 'b'])
     expect(graph.nodes.every(node => node.depth >= 0)).toBe(true)
-    expect(graph.edges.length).toBeLessThan(2)
+    expect(graph.edges).toEqual([])
   })
 })
 
@@ -73,6 +73,11 @@ describe('latestStableBoundary', () => {
 
   it('treats an initializing session snapshot without turn ends as unavailable', () => {
     expect(latestStableBoundary({ running: false } as never)).toBeUndefined()
+  })
+
+  it('treats a missing or malformed session snapshot as unavailable', () => {
+    expect(latestStableBoundary(undefined as never)).toBeUndefined()
+    expect(latestStableBoundary({ running: false, turnEnds: null } as never)).toBeUndefined()
   })
 })
 

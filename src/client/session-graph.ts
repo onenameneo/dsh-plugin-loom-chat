@@ -49,6 +49,22 @@ function compareSummary(a: SessionSummary, b: SessionSummary): number {
 export function buildSessionGraph(summaries: readonly SessionSummary[]): SessionGraph {
   const ordinary = summaries.filter(summary => summary.origin !== 'subagent').sort(compareSummary)
   const byId = new Map(ordinary.map(summary => [summary.id, summary]))
+  const cyclic = new Set<SessionId>()
+  for (const summary of ordinary) {
+    const path: SessionId[] = []
+    const positions = new Map<SessionId, number>()
+    let current: SessionId | undefined = summary.id
+    while (current !== undefined && byId.has(current)) {
+      const position = positions.get(current)
+      if (position !== undefined) {
+        for (const id of path.slice(position)) cyclic.add(id)
+        break
+      }
+      positions.set(current, path.length)
+      path.push(current)
+      current = byId.get(current)?.parentId
+    }
+  }
   const depths = new Map<SessionId, number>()
 
   const depthOf = (id: SessionId, visiting: ReadonlySet<SessionId> = new Set()): number => {
@@ -113,7 +129,10 @@ export function buildSessionGraph(summaries: readonly SessionSummary[]): Session
   const edges = nodes.flatMap((node) => {
     if (node.parentId === undefined) return []
     const parent = nodeById.get(node.parentId)
-    return parent !== undefined && parent.depth < node.depth
+    return parent !== undefined
+      && parent.depth < node.depth
+      && !cyclic.has(parent.id)
+      && !cyclic.has(node.id)
       ? [{ from: parent.id, to: node.id }]
       : []
   })
@@ -125,8 +144,13 @@ export function buildSessionGraph(summaries: readonly SessionSummary[]): Session
  * @param snapshot - DSH session snapshot.
  * @returns a completed turn-end sequence, or undefined while no safe boundary exists.
  */
-export function latestStableBoundary(snapshot: Pick<ConversationSnapshot, 'turnEnds' | 'running'>): number | undefined {
-  const turnEnds = snapshot.turnEnds
-  if (snapshot.running || turnEnds === undefined || turnEnds.size === 0) return undefined
-  return Math.max(...turnEnds.values())
+export function latestStableBoundary(snapshot: Pick<ConversationSnapshot, 'turnEnds' | 'running'> | null | undefined): number | undefined {
+  const turnEnds = snapshot?.turnEnds
+  if (snapshot?.running || turnEnds == null || typeof turnEnds.size !== 'number' || turnEnds.size === 0) return undefined
+  if (typeof turnEnds.values !== 'function') return undefined
+  let latest: number | undefined
+  for (const value of turnEnds.values()) {
+    if (typeof value === 'number' && Number.isFinite(value) && (latest === undefined || value > latest)) latest = value
+  }
+  return latest
 }
