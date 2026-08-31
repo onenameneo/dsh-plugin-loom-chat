@@ -14,7 +14,7 @@ export function LoomBranchAction({
   useLoom, forkAt, t,
 }: LoomBranchActionProps) {
   const visibleOrdinarySession = useLoom(snapshot => snapshot.nodes.some(node => node.id === sessionId))
-  const atSeq = useSession(snapshot => snapshot.nodes.find(node =>
+  const atSeq = useSession(snapshot => snapshot.nodes?.find(node =>
     node.kind === 'assistant' && node.messageId === messageId,
   )?.seq)
   const [pending, setPending] = useState(false)

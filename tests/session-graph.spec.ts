@@ -70,6 +70,10 @@ describe('latestStableBoundary', () => {
       running: true,
     })).toBeUndefined()
   })
+
+  it('treats an initializing session snapshot without turn ends as unavailable', () => {
+    expect(latestStableBoundary({ running: false } as never)).toBeUndefined()
+  })
 })
 
 describe('Canvas node status', () => {

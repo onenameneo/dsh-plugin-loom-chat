@@ -35,6 +35,8 @@ const useSession = (select: (value: never) => unknown) => select({
   nodes: [{ kind: 'assistant', messageId: 'message-1', seq: 11 }],
 } as never)
 
+const useUninitializedSession = (select: (value: never) => unknown) => select({} as never)
+
 describe('LoomBranchAction', () => {
   it('renders beside the ordinary branch action and forks the addressed message into Loom', () => {
     const forkAt = vi.fn(async () => {})
@@ -76,6 +78,30 @@ describe('LoomBranchAction', () => {
         useSessions={neverHook}
         useWorkspaces={neverHook}
         useLoom={select => select(snapshot([]))}
+        forkAt={vi.fn(async () => {})}
+        t={t}
+      />,
+    )
+
+    expect(ui.queryByRole('button', { name: 'Branch into Loom Chat' })).toBeNull()
+  })
+
+  it('does not crash while the session snapshot is still initializing', () => {
+    const ui = render(
+      <LoomBranchAction
+        sessionId={'main' as SessionId}
+        messageId={'message-1' as never}
+        useSession={useUninitializedSession as never}
+        useProjection={neverHook}
+        useInput={neverHook}
+        inputActions={neverHook}
+        useSessions={neverHook}
+        useWorkspaces={neverHook}
+        useLoom={select => select(snapshot([{
+          id: 'main' as SessionId, title: 'Main', parentId: undefined, depth: 0, x: 0, y: 0,
+          running: false, pending: false, completed: false, blank: false, updatedAt: 0,
+          selected: true, canBranch: false, error: null,
+        }]))}
         forkAt={vi.fn(async () => {})}
         t={t}
       />,

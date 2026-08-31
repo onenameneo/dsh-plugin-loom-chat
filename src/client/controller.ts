@@ -236,9 +236,10 @@ function textFromUserNode(node: unknown): string {
 
 function firstUserPromptAfter(session: SessionFace, atSeq: number): string | undefined {
   const snapshot = session.getSnapshot()
-  if (!Array.isArray(snapshot.chat.order)) return undefined
-  for (const key of snapshot.chat.order) {
-    const node = snapshot.chat.nodes.get(key)
+  const chat = snapshot.chat
+  if (chat === undefined || !Array.isArray(chat.order) || chat.nodes === undefined) return undefined
+  for (const key of chat.order) {
+    const node = chat.nodes.get(key)
     if (node?.kind !== 'user' || node.anchorSeq <= atSeq) continue
     const prompt = textFromUserNode(node)
     if (prompt.length > 0) return prompt
@@ -630,7 +631,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       text: selection.toString(),
       flowKey,
       flowKind,
-      node: flowKey === undefined ? undefined : session?.getSnapshot().chat.nodes.get(flowKey),
+      node: flowKey === undefined ? undefined : session?.getSnapshot().chat?.nodes?.get(flowKey),
     })
     this.selectionTarget = target
     this.selectionRect = target === null ? null : this.rectOf(range)
@@ -733,6 +734,9 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
         if (!presentation.branchBoundaryResolved
           && snapshot?.openState === 'open'
           && snapshot.running === false
+          && snapshot.chat !== undefined
+          && snapshot.chat.nodes !== undefined
+          && snapshot.turnEnds !== undefined
           && (inputPhase === undefined || inputPhase === 'plain')) {
           const inheritedAnchors = [
             ...snapshot.chat.nodes.values().map(node => node.anchorSeq),
@@ -841,8 +845,10 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     if (inputPhase !== undefined && inputPhase !== 'plain') return true
     const snapshot = session?.getSnapshot()
     if (snapshot === undefined) return false
-    return snapshot.chat.order.some(key => {
-      const node = snapshot.chat.nodes.get(key)
+    const chat = snapshot.chat
+    if (chat === undefined || !Array.isArray(chat.order) || chat.nodes === undefined) return false
+    return chat.order.some(key => {
+      const node = chat.nodes.get(key)
       return node !== undefined
         && node.anchorSeq > branchAtSeq
         && (node.kind === 'user' || node.kind === 'steering' || node.kind === 'command')

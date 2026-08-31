@@ -126,6 +126,7 @@ export function buildSessionGraph(summaries: readonly SessionSummary[]): Session
  * @returns a completed turn-end sequence, or undefined while no safe boundary exists.
  */
 export function latestStableBoundary(snapshot: Pick<ConversationSnapshot, 'turnEnds' | 'running'>): number | undefined {
-  if (snapshot.running || snapshot.turnEnds.size === 0) return undefined
-  return Math.max(...snapshot.turnEnds.values())
+  const turnEnds = snapshot.turnEnds
+  if (snapshot.running || turnEnds === undefined || turnEnds.size === 0) return undefined
+  return Math.max(...turnEnds.values())
 }
