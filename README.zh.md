@@ -2,6 +2,49 @@
 
 Loom Chat 是一个 DSH Web 客户端插件，把线性的普通会话转换为可平移、缩放和并行操作的 Loom 风格无限画布。
 
+[![npm version](https://img.shields.io/npm/v/dsh-loom-chat.svg)](https://www.npmjs.com/package/dsh-loom-chat)
+[English README](README.md) · [GitHub 仓库](https://github.com/onenameneo/dsh-plugin-loom-chat)
+
+## 安装
+
+Loom Chat 已通过 npm 分发，npm 包包含预构建的浏览器代码。根据需要选择稳定版或预发布版：
+
+### 稳定版
+
+```sh
+dsh plugin --profile web add dsh-loom-chat
+dsh web
+```
+
+### 预发布版
+
+`next` 标签用于候选版本和其他预发布版本：
+
+```sh
+dsh plugin --profile web add dsh-loom-chat@next
+dsh web
+```
+
+### 从 GitHub 安装
+
+需要最新的、尚未发布的提交时，可以直接安装仓库源码：
+
+```sh
+dsh plugin --profile web add github:onenameneo/dsh-plugin-loom-chat
+dsh web
+```
+
+从 GitHub 安装时会通过 `prepare` 脚本在本地构建。如果 pnpm 要求确认构建权限，请将它提示的准确包名添加到 profile 的 `pnpm-workspace.yaml` 中的 `allowBuilds`，然后重新执行安装命令。日常使用建议从 npm 安装，因为 npm 包直接提供预构建产物。
+
+更新或卸载插件：
+
+```sh
+dsh plugin --profile web update dsh-loom-chat
+dsh plugin --profile web remove dsh-loom-chat
+```
+
+插件只装配到 `web` profile，不会修改 DSH 原生侧边栏，也不会替换原生会话渲染器。
+
 ## 功能介绍
 
 它适合需要围绕一个问题同时探索多个方向的场景：保留主会话作为上下文起点，把新的问题分支到独立会话中，并在画布上同时查看各条探索路径。
@@ -57,14 +100,11 @@ Canvas 窗口使用 DSH 公开的 session face 和每会话 input face。它是�
 
 插件不修改 DSH 原生侧边栏、`ui-workspace` 或主会话渲染器。Canvas 使用公开的 session/runtime 与 `shell.overlay` Slot；每个脱离当前选择的 Canvas 窗口都通过 `session.open()` 加载自己的历史，不改变当前会话；单会话模式通过 `ctx.sessions.open()` 交回宿主会话界面。
 
-## 作为 Web 插件安装
+## 兼容性
 
-当前暂未发布到 npm，请直接从 GitHub 仓库安装：
-
-```sh
-dsh plugin --profile web add github:onenameneo/dsh-plugin-loom-chat
-dsh web
-```
+- 需要使用 DSH Web profile，以及公开的 session、runtime、conversation、workspace 和 UI slot 能力。
+- 插件依赖 DSH 当前的开发预览 API；随着 DSH 演进，兼容性可能发生变化。
+- 本地开发和构建需要 Node.js `^22.19.0` 或 `>=24.0.0`，以及 pnpm `11.7.0`。
 
 ## 本地开发
 
@@ -82,3 +122,20 @@ pnpm pack --pack-destination ./.artifacts
 DSH_HOME=/tmp/dsh-loom-chat-profile \
   dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.1.tgz"
 ```
+
+## 发布 npm
+
+维护者可以将候选版本发布到 `next`，将稳定版本发布到 `latest`：
+
+```sh
+npm login
+npm whoami
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm pack --dry-run
+pnpm publish --tag next       # 候选版本
+# pnpm publish --tag latest   # 稳定版本
+```
+
+`prepare` 脚本会在发布前构建 `lib/`；`files` 字段会限制最终包只包含运行时代码、类型声明、DSH patch、文档和许可证。

@@ -2,6 +2,49 @@
 
 Loom Chat is a DSH Web client plugin that turns linear ordinary sessions into a pannable, zoomable Loom-style canvas for parallel exploration.
 
+[![npm version](https://img.shields.io/npm/v/dsh-loom-chat.svg)](https://www.npmjs.com/package/dsh-loom-chat)
+[中文说明](README.zh.md) · [GitHub repository](https://github.com/onenameneo/dsh-plugin-loom-chat)
+
+## Install
+
+Loom Chat is available as an npm package with prebuilt browser code. Use the release channel that matches the version you want:
+
+### Stable release
+
+```sh
+dsh plugin --profile web add dsh-loom-chat
+dsh web
+```
+
+### Prerelease
+
+The `next` tag is for release candidates and other prereleases:
+
+```sh
+dsh plugin --profile web add dsh-loom-chat@next
+dsh web
+```
+
+### Install from GitHub
+
+Use the repository source when you need the latest unreleased commit:
+
+```sh
+dsh plugin --profile web add github:onenameneo/dsh-plugin-loom-chat
+dsh web
+```
+
+GitHub installs build the package locally through its `prepare` script. If pnpm asks for permission to run the build, add the exact package name it reports to the profile's `pnpm-workspace.yaml` under `allowBuilds`, then run the install command again. Prefer the npm installation for normal use because it downloads prebuilt artifacts.
+
+To update or remove the plugin:
+
+```sh
+dsh plugin --profile web update dsh-loom-chat
+dsh plugin --profile web remove dsh-loom-chat
+```
+
+The plugin contributes to the `web` profile only; it does not modify the DSH native sidebar or replace the native conversation renderer.
+
 ## What it does
 
 It is designed for exploring several directions around one question: keep the main session as the context origin, fork new questions into independent sessions, and inspect the resulting paths together on the canvas.
@@ -57,14 +100,11 @@ For the minimal Cordis plugin structure, see [Your first plugin](https://github.
 
 The plugin does not modify DSH's native sidebar, `ui-workspace`, or the main conversation renderer. Canvas uses the public session/runtime APIs and `shell.overlay`; each detached Canvas window calls `session.open()` to load its own history without changing the current session. Single-session mode returns control to the host with `ctx.sessions.open()`.
 
-## Install as a Web plugin
+## Compatibility
 
-The package is not published to npm yet. Install it directly from GitHub:
-
-```sh
-dsh plugin --profile web add github:onenameneo/dsh-plugin-loom-chat
-dsh web
-```
+- DSH Web profile with the public session, runtime, conversation, workspace, and UI slot APIs.
+- The plugin follows the DSH developer-preview APIs; compatibility can change as DSH evolves.
+- Local development and package builds require Node.js `^22.19.0` or `>=24.0.0` and pnpm `11.7.0`.
 
 ## Local development
 
@@ -82,3 +122,20 @@ Test a packed plugin in a temporary profile:
 DSH_HOME=/tmp/dsh-loom-chat-profile \
   dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.1.tgz"
 ```
+
+## Publishing
+
+Maintainers can publish a prerelease to the `next` channel or a stable release to `latest`:
+
+```sh
+npm login
+npm whoami
+pnpm test
+pnpm typecheck
+pnpm build
+pnpm pack --dry-run
+pnpm publish --tag next       # release candidate
+# pnpm publish --tag latest   # stable release
+```
+
+The `prepare` script builds `lib/` before publishing, and `files` limits the published package to the runtime, type declarations, DSH patch, documentation, and license.
