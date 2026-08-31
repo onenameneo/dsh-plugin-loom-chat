@@ -120,7 +120,7 @@ pnpm pack --pack-destination ./.artifacts
 
 ```sh
 DSH_HOME=/tmp/dsh-loom-chat-profile \
-  dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.1.tgz"
+  dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.2.tgz"
 ```
 
 ## 发布 npm
