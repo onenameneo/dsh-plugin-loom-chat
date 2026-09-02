@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { LoomBranchAction } from '../src/client/LoomBranchAction.js'
 import type { LoomChatSnapshot } from '../src/client/controller.js'
 import { en } from '../src/client/locales.js'
@@ -42,6 +42,9 @@ const useChatSnapshot = (select: (value: never) => unknown) => select({
     data: { finalNode: { messageId: 'message-1', seq: 11 } },
   }] } },
 } as never)
+const useMalformedSnapshot = (select: (value: never) => unknown) => select({
+  chat: { nodes: {} },
+} as never)
 
 describe('LoomBranchAction', () => {
   it('renders beside the ordinary branch action and forks the addressed message into Loom', () => {
@@ -51,6 +54,9 @@ describe('LoomBranchAction', () => {
         sessionId={'main' as SessionId}
         messageId={'message-1' as never}
         useSession={useSession as never}
+        useConversation={neverHook}
+        useChat={neverHook}
+        useSessionPendingInteraction={neverHook}
         useProjection={neverHook}
         useInput={neverHook}
         inputActions={neverHook}
@@ -78,6 +84,9 @@ describe('LoomBranchAction', () => {
         sessionId={'subagent-1' as SessionId}
         messageId={'message-1' as never}
         useSession={useSession as never}
+        useConversation={neverHook}
+        useChat={neverHook}
+        useSessionPendingInteraction={neverHook}
         useProjection={neverHook}
         useInput={neverHook}
         inputActions={neverHook}
@@ -98,6 +107,9 @@ describe('LoomBranchAction', () => {
         sessionId={'main' as SessionId}
         messageId={'message-1' as never}
         useSession={useUninitializedSession as never}
+        useConversation={neverHook}
+        useChat={neverHook}
+        useSessionPendingInteraction={neverHook}
         useProjection={neverHook}
         useInput={neverHook}
         inputActions={neverHook}
@@ -123,6 +135,9 @@ describe('LoomBranchAction', () => {
         sessionId={'main' as SessionId}
         messageId={'message-1' as never}
         useSession={useChatSnapshot as never}
+        useConversation={neverHook}
+        useChat={neverHook}
+        useSessionPendingInteraction={neverHook}
         useProjection={neverHook}
         useInput={neverHook}
         inputActions={neverHook}
@@ -139,5 +154,32 @@ describe('LoomBranchAction', () => {
     )
 
     expect(ui.getByRole('button', { name: 'Branch into Loom Chat' })).toBeTruthy()
+  })
+
+  it('does not crash when a session exposes an incomplete node store during startup', () => {
+    const ui = render(
+      <LoomBranchAction
+        sessionId={'main' as SessionId}
+        messageId={'message-1' as never}
+        useSession={useMalformedSnapshot as never}
+        useConversation={neverHook}
+        useChat={neverHook}
+        useSessionPendingInteraction={neverHook}
+        useProjection={neverHook}
+        useInput={neverHook}
+        inputActions={neverHook}
+        useSessions={neverHook}
+        useWorkspaces={neverHook}
+        useLoom={select => select(snapshot([{
+          id: 'main' as SessionId, title: 'Main', parentId: undefined, depth: 0, x: 0, y: 0,
+          running: false, pending: false, completed: false, blank: false, updatedAt: 0,
+          selected: true, canBranch: false, error: null,
+        }]))}
+        forkAt={vi.fn(async () => {})}
+        t={t}
+      />,
+    )
+
+    expect(ui.queryByRole('button', { name: 'Branch into Loom Chat' })).toBeNull()
   })
 })

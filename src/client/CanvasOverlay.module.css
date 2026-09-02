@@ -31,7 +31,7 @@
 .minimapNode[data-selected='true'] { fill: #82b2ed; stroke: #2d74c8; stroke-width: 1.5; }
 .minimapNode[data-running='true'] { fill: #a9e4c8; stroke: #35a975; }
 .minimapViewport { fill: rgb(52 123 218 / 10%); stroke: #347bd9; stroke-width: 1.5; stroke-dasharray: 4 3; cursor: move; pointer-events: auto; }
-.world { position: absolute; top: 96px; left: 96px; width: 4800px; height: 4200px; transform-origin: 0 0; }
+.world { position: absolute; top: 96px; left: 96px; width: 4800px; height: 4200px; }
 .edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .edge { fill: none; stroke: #91a8c1; stroke-width: 2; stroke-linecap: round; opacity: .58; }
 .windowPosition { position: absolute; width: 480px; }
@@ -44,11 +44,11 @@
 .windowIdentity { display: flex; min-width: 0; align-items: center; gap: 10px; }
 .windowHeading { display: grid; min-width: 0; gap: 2px; }
 .windowHeading strong { overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.windowHeading span, .windowComposerHint { color: #8294a9; font-size: 10px; }
+.windowHeading span { color: #8294a9; font-size: 10px; }
 .windowActions { display: flex; flex: none; align-items: center; gap: 5px; }
-.windowIconButton, .windowSendButton { display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgb(65 91 122 / 16%); border-radius: 8px; background: rgb(255 255 255 / 84%); color: #4f6177; cursor: pointer; }
+.windowIconButton { display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgb(65 91 122 / 16%); border-radius: 8px; background: rgb(255 255 255 / 84%); color: #4f6177; cursor: pointer; }
 .windowIconButton { width: 28px; height: 28px; color: #3977bd; }
-.windowIconButton:hover, .windowSendButton:hover { border-color: rgb(48 105 186 / 35%); background: #fff; color: #245a9c; }
+.windowIconButton:hover { border-color: rgb(48 105 186 / 35%); background: #fff; color: #245a9c; }
 .deleteConfirmation { position: absolute; z-index: 30; top: 55px; right: 14px; width: 190px; padding: 10px; border: 1px solid rgb(65 91 122 / 18%); border-radius: 10px; background: #fff; box-shadow: 0 12px 24px rgb(45 64 87 / 18%); color: #334960; }
 .deleteConfirmation p { margin: 0 0 9px; font-size: 11px; line-height: 1.45; }
 .deleteConfirmationActions { display: flex; justify-content: flex-end; gap: 6px; }
@@ -57,48 +57,72 @@
 .deleteCancelButton:hover { background: #f5f8fb; }
 .deleteConfirmButton:hover { border-color: rgb(201 73 73 / 45%); background: #ffecec; }
 .windowTranscript { min-width: 0; min-height: 0; flex: 1; overflow: auto; padding: 8px 7px 6px; overscroll-behavior: contain; user-select: text; }
-.nativeTranscript { overflow: hidden; padding: 0; }
-.referenceNativeTranscript { display: flex; flex-direction: column; gap: 8px; padding: 10px 10px 0; overflow: hidden; }
-.referenceScrollTranscript { overflow-x: hidden; overflow-y: auto; }
-.referenceScrollTranscript .nativeSession { height: auto; flex: 0 0 auto; }
-.referenceScrollTranscript .nativeSession :global([data-conversation-embedded]) { height: auto; min-height: auto; flex: 0 0 auto; }
-.referenceScrollTranscript .nativeSession :global([data-conversation-embedded]) > :global(*) { height: auto; min-height: auto; flex: 0 0 auto; }
-.referenceScrollTranscript .nativeSession :global([data-conversation-embedded]) > :global(*) > :global(*) { min-height: auto; overflow: visible; flex: 0 0 auto; }
+.nativeSession { display: flex; min-width: 0; min-height: 100%; flex: 1; flex-direction: column; color: #26384d; user-select: text; }
+.nativeSession > div { min-width: 0; min-height: 100%; flex: 1; }
+.nativeSession [data-chat-flow] { min-width: 0; user-select: text; }
+.nativeSession [data-chat-anchor-key] { min-width: 0; }
+.nativeAssistant { min-width: 0; }
+.nativeAssistantActions { display: flex; min-height: 28px; align-items: center; justify-content: flex-end; gap: 2px; margin: 6px 0 0 -6px; color: #8796a8; }
 .referenceTranscript { padding: 10px 8px 6px; background: linear-gradient(180deg, rgb(242 247 255 / 58%), rgb(255 255 255 / 0%) 220px); }
-.nativeSession { display: flex; min-width: 0; min-height: 0; width: 100%; height: 100%; flex: 1; flex-direction: column; overflow: hidden; }
-.nativeSession > * { box-sizing: border-box; min-width: 0; width: 100%; }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) > :global(*) > :global(*) { padding: 8px 6px 6px; }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) :global([data-chat-flow]) { gap: 8px; }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) :global([data-chat-flow-kind='user']) > :global(*) { font-size: 13px; line-height: 20px; }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) :global([data-chat-flow-kind='assistant-step']) > :global(*) { font-size: 13px; line-height: 21px; }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) :global([data-chat-flow-kind='assistant-step']) > :global(*) > :global(*) { gap: 8px; }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) :global(.md-code-block) { margin: 6px 0; --dsl-code-block-border-radius: 7px; --dsl-code-block-banner-font: 10px/15px var(--ds-font-family-base); --dsl-code-block-content-font: 10px/16px var(--ds-font-family-code); }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) :global(.md-code-block) > div > div { padding: 5px 8px; }
-.nativeSession[data-canvas-density='compact'] :global([data-conversation-embedded]) :global(.md-code-block) :global(pre) { padding: 8px; }
 .windowNotice { margin: 18px 4px; color: #8294a9; font-size: 12px; line-height: 1.6; }
 .message { margin: 0 0 10px; padding: 0 0 8px; border-bottom: 1px solid rgb(65 91 122 / 8%); }
 .message:last-child { margin-bottom: 0; border-bottom: 0; }
 .messageRole { display: block; margin-bottom: 3px; color: #8294a9; font-size: 9px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.message p { margin: 0; color: #26384d; font-size: 11px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
-.message[data-kind='user'] { padding: 7px 9px; border: 0; border-radius: 10px; background: #eef4fb; }
-.message[data-kind='branch-reference'] { margin: 0; padding: 10px 12px 11px; border: 1px solid rgb(63 131 216 / 22%); border-radius: 11px; background: linear-gradient(135deg, #f5f9ff, #edf4ff); box-shadow: inset 0 1px 0 rgb(255 255 255 / 82%); }
-.message[data-kind='branch-reference'] .messageRole { margin-bottom: 5px; color: #3977bd; font-size: 9px; letter-spacing: .03em; }
-.message[data-kind='branch-reference'] p { color: #304b6b; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
-.windowComposer { margin: 0 8px 8px; padding: 7px; border: 1px solid rgb(65 91 122 / 14%); border-radius: 11px; background: rgb(248 250 253 / 96%); }
-.nativeComposerShell { width: 100%; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; }
-.nativeComposer { position: relative; z-index: 2; min-width: 0; width: 100%; overflow: visible; }
-.nativeComposer > * { min-width: 0; }
-.windowTextarea { display: block; width: 100%; min-height: 52px; max-height: 120px; resize: vertical; border: 0; outline: none; background: transparent; color: #1e2e42; font: inherit; font-size: 12px; line-height: 1.5; }
-.windowTextarea::placeholder { color: #a0adbb; }
-.windowComposerBar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; }
-.windowComposerHint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.windowSendButton { min-width: 46px; min-height: 28px; padding: 0 9px; font-size: 11px; font-weight: 700; }
-.windowSendButton:disabled { cursor: default; opacity: .42; }
-.selectionMenuAnchor { position: absolute; z-index: 40; pointer-events: auto; }
+.messageBlocks { display: grid; gap: 9px; min-width: 0; }
+.nativeMessageActions { display: flex; min-height: 28px; align-items: center; justify-content: flex-end; gap: 2px; margin-top: 6px; color: #8796a8; }
+.nativeMessageAction { display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; padding: 5px; border: 0; border-radius: 7px; background: transparent; color: #8796a8; cursor: pointer; }
+.nativeMessageAction:hover { background: #eef4fb; color: #3977bd; }
+.thinkingBlock { border-radius: 8px; background: #f6f8fb; color: #75869a; font-size: 10px; }
+.thinkingBlock summary { padding: 6px 9px; cursor: pointer; font-weight: 650; list-style: none; }
+.thinkingBlock summary::before { display: inline-block; margin-right: 5px; content: '›'; transition: transform 120ms ease; }
+.thinkingBlock[open] summary::before { transform: rotate(90deg); }
+.thinkingBlock > div { padding: 0 9px 8px; }
+.toolBlock { border: 1px solid rgb(65 91 122 / 12%); border-radius: 8px; background: #f8fafc; color: #5f7187; font-size: 10px; }
+.toolBlock summary { padding: 7px 9px; cursor: pointer; font-weight: 650; }
+.toolBlock > div { padding: 0 9px 8px; }
+.messageBlock { min-width: 0; color: #26384d; font-size: 11px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+.messageBlock :global(p) { margin: 0 0 7px; }
+.messageBlock :global(p:last-child) { margin-bottom: 0; }
+.messageBlock :global(pre) { max-width: 100%; overflow: auto; }
+.messageReasoning { color: #718198; font-style: italic; }
+.messageCode { margin: 0; padding: 8px 9px; overflow: auto; border: 1px solid rgb(65 91 122 / 13%); border-radius: 8px; background: #f5f7fa; color: #253a52; font: 10px/1.55 var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace); white-space: pre; }
+.messageCode code { font: inherit; }
+.message[data-kind='user'] { padding: 8px 10px 4px; border: 0; border-radius: 10px; background: #eef4fb; }
+.message[data-kind='user'] .nativeMessageActions { margin-top: 3px; }
+.branchReference { margin: 0 0 10px; padding: 10px 12px 11px; border: 1px solid rgb(63 131 216 / 22%); border-radius: 11px; background: linear-gradient(135deg, #f5f9ff, #edf4ff); box-shadow: inset 0 1px 0 rgb(255 255 255 / 82%); }
+.branchReferenceRole { display: block; margin-bottom: 5px; color: #3977bd; font-size: 9px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.branchReference p { margin: 0; color: #304b6b; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.windowComposer { margin: 0; padding: 0; border: 0; background: transparent; }
+.windowComposer, .nativeComposerSeat, .nativeComposerSeat textarea { user-select: text; touch-action: auto; }
+.nativeComposerModel { display: inline-flex; height: 22px; align-items: center; padding: 0 7px; border: 1px solid rgb(65 91 122 / 12%); border-radius: 6px; background: rgb(255 255 255 / 68%); white-space: nowrap; }
+.nativeComposerModel { margin-left: auto; color: #60758e; }
+.nativeComposerAccessFallback { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; color: #60758e; font-size: 12px; }
+.nativeComposerStats { min-width: 0; width: 100%; }
+.nativeComposerSeat { min-width: 0; width: 100%; }
+.canvasAttachmentRail { display: flex; gap: 8px; min-width: 0; padding: 4px 12px 0; overflow-x: auto; scrollbar-width: none; }
+.canvasAttachmentRail::-webkit-scrollbar { display: none; }
+.canvasAttachmentItem { position: relative; flex: 0 0 52px; width: 52px; height: 52px; }
+.canvasAttachmentPreview { display: block; width: 52px; height: 52px; padding: 0; overflow: hidden; border: 1px solid rgb(65 91 122 / 18%); border-radius: 12px; background: #f5f8fc; cursor: zoom-in; }
+.canvasAttachmentPreview img { display: block; width: 52px; height: 52px; object-fit: cover; }
+.canvasAttachmentRemove { position: absolute; top: 2px; right: 2px; display: grid; width: 17px; height: 17px; padding: 0; place-items: center; border: 0; border-radius: 50%; background: rgb(32 42 55 / 78%); color: #fff; cursor: pointer; font-size: 14px; line-height: 17px; opacity: 0; }
+.canvasAttachmentItem:hover .canvasAttachmentRemove, .canvasAttachmentRemove:focus-visible { opacity: 1; }
+.canvasDropOverlay { position: fixed; z-index: 10000; inset: 16px; display: grid; place-content: center; gap: 5px; border: 2px dashed #4c8cdb; border-radius: 16px; background: rgb(230 241 255 / 86%); color: #3068a8; text-align: center; pointer-events: none; }
+.canvasDropOverlay span { color: #6983a1; font-size: 11px; }
+.canvasMessageImages { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; }
+.canvasMessageImages[data-align='end'] { justify-content: flex-end; }
+.canvasMessageImage { display: grid; min-width: 64px; min-height: 64px; max-width: 240px; padding: 0; place-items: center; overflow: hidden; border: 1px solid rgb(65 91 122 / 16%); border-radius: 12px; background: #f5f8fc; color: #8294a9; cursor: zoom-in; }
+.canvasMessageImage img { display: block; max-width: 240px; max-height: 240px; object-fit: contain; }
+.canvasAttachmentFailed { padding: 7px 9px; border: 1px solid rgb(180 70 70 / 22%); border-radius: 8px; background: #fff5f5; color: #a54949; cursor: pointer; font-size: 11px; }
+.canvasImageLightbox { position: fixed; z-index: 10001; inset: 0; display: grid; padding: 32px; place-items: center; background: rgb(10 18 28 / 76%); cursor: zoom-out; }
+.canvasImageLightbox img { max-width: min(92vw, 1200px); max-height: 92vh; object-fit: contain; }
+.nativeCommandMenu { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgb(65 91 122 / 14%); border-radius: 8px; background: #fff; color: #60758e; font-size: 12px; box-shadow: 0 8px 20px rgb(31 56 84 / 14%); }
+.nativeCommandMenu button { border: 0; background: transparent; color: #3977bd; cursor: pointer; }
 .sessionSelectionMenuAnchor { position: fixed; z-index: 950; pointer-events: auto; }
 .selectionMenuVisible { animation: selectionMenuEnter 150ms cubic-bezier(.2, .8, .2, 1); transform-origin: 50% 100%; }
 .selectionMenuClosing { animation: selectionMenuExit 120ms ease-in forwards; pointer-events: none; transform-origin: 50% 100%; }
 .selectionMenuReference { display: block; pointer-events: none; }
+.sessionSelectionMenuAnchor > span { display: block; width: 0; height: 0; line-height: 0; }
+.sessionSelectionMenuAnchor [role='menu'] { left: 50%; transform: translateX(-50%); }
 .empty { position: absolute; top: 50%; left: 50%; width: min(360px, calc(100% - 48px)); padding: 30px; border: 1px dashed rgb(93 122 157 / 30%); border-radius: 18px; background: rgb(255 255 255 / 55%); color: #70849b; font-size: 14px; line-height: 1.6; text-align: center; transform: translate(-50%, -50%); }
 @keyframes selectionMenuEnter { from { opacity: 0; transform: translateY(5px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes selectionMenuExit { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(3px) scale(.94); } }

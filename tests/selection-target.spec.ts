@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ChatConversationViewNode, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { resolveSelectionTarget } from '../src/client/selection-target.js'
 
 const SESSION = 'main' as SessionId
@@ -12,7 +13,7 @@ function node(data: unknown, location: ChatConversationViewNode['location'] = {
     end: { type: 'turn/end', seq: 12, time: 12, data: { turn: 1, reason: { kind: 'completed' } } } as never,
     status: 'closed',
     steps: [],
-    data: { get: () => undefined },
+    data: { get: () => undefined, source: () => ({ getSnapshot: () => undefined, subscribe: () => () => {} }) },
   },
 }): ChatConversationViewNode {
   return {
@@ -73,7 +74,7 @@ describe('resolveSelectionTarget', () => {
           end: undefined,
           status: 'open',
           steps: [],
-          data: { get: () => undefined },
+          data: { get: () => undefined, source: () => ({ getSnapshot: () => undefined, subscribe: () => () => {} }) },
         },
         step: {
           turn: 1,
@@ -81,7 +82,7 @@ describe('resolveSelectionTarget', () => {
           start: undefined,
           end: undefined,
           status: 'open',
-          data: { get: () => undefined },
+          data: { get: () => undefined, source: () => ({ getSnapshot: () => undefined, subscribe: () => () => {} }) },
         },
       }),
     })).toBeNull()

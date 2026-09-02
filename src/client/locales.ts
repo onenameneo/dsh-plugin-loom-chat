@@ -118,7 +118,7 @@ export const en = {
   contextTools: 'Tools',
   contextMessages: 'Messages',
   statsLabel: 'Session statistics',
-  statsCounts: '{turns} round · {steps} steps',
+  statsCounts: '{turns} turns · {steps} steps',
   statsLlm: 'LLM {duration}',
   statsTool: 'Tool call {duration}',
   statsTtft: 'First token {duration}',

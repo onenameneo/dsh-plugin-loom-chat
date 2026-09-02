@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ChatConversationViewNode, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { LoomChatController } from '../src/client/controller.js'
 
 afterEach(() => {
@@ -14,8 +15,8 @@ function node(): ChatConversationViewNode {
     location: {
       kind: 'turn', turn: {
         turn: 1, start: undefined,
-        end: { type: 'turn/end', seq: 12, time: 12, data: { turn: 1, reason: { kind: 'completed' } } },
-        status: 'closed', steps: [], data: { get: () => undefined },
+        end: { type: 'turn/end', seq: 12 as never, time: 12, data: { turn: 1, reason: { kind: 'completed' } } },
+        status: 'closed', steps: [], data: { get: () => undefined, source: () => ({ getSnapshot: () => undefined, subscribe: () => () => {} }) },
       },
     },
     visibility: 'visible', data: { finalNode: { seq: 11, messageId: 'message-1' } },
@@ -215,8 +216,9 @@ describe('LoomChatController selection branching', () => {
       branchPrompt: expect.stringContaining('selected answer'),
     })
     controller.sendSession(childId)
-    expect(input.setDraft).toHaveBeenLastCalledWith(expect.stringContaining('<selected-content>\nselected answer\n</selected-content>'))
-    expect(input.setDraft).toHaveBeenLastCalledWith(expect.stringContaining(question))
+    expect(input.setDraft).toHaveBeenCalledWith(expect.stringContaining('<selected-content>\nselected answer\n</selected-content>'))
+    expect(input.setDraft).toHaveBeenCalledWith(expect.stringContaining(question))
+    expect(input.setDraft).toHaveBeenLastCalledWith('')
     expect(input.submit).toHaveBeenCalledOnce()
     expect(rename).toHaveBeenCalledWith('请解释注意力机制的原理，并说明它如何帮助模型理解上下文以及长…')
     expect(controller.getSnapshot().windows.find(window => window.id === childId)?.title)

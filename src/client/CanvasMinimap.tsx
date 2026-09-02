@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { CanvasNodeSnapshot, CanvasViewport } from './controller.js'
 import { CANVAS_WINDOW_HEIGHT, CANVAS_WINDOW_WIDTH } from './session-graph.js'

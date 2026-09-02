@@ -2,11 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react'
 import { IconRefreshOutline16, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { CanvasNodeSnapshot, CanvasViewport, SelectionRect } from './controller.js'
 import type { CanvasSessionWindowSnapshot } from './controller.js'
 import { CANVAS_WINDOW_HEIGHT, CANVAS_WINDOW_WIDTH } from './session-graph.js'
-import type { LoomChatProps, LoomRenderSessionSlot } from './slots.js'
+import type { LoomChatProps } from './slots.js'
 import { NS } from './locales.js'
 import { CanvasSessionWindow } from './CanvasSessionWindow.js'
 import { CanvasMinimap } from './CanvasMinimap.js'
@@ -24,8 +24,8 @@ interface CanvasSurfaceProps {
   onDraft: (id: SessionId, text: string) => void
   onSend: (id: SessionId) => void
   onCancel: (id: SessionId) => void
+  onBranch?: (id: SessionId, atSeq: number) => Promise<void> | void
   onForkSelection?: () => void
-  renderSessionSlot?: LoomRenderSessionSlot | undefined
   onViewport: (viewport: CanvasViewport) => void
   onResetViewport: () => void
   selectionRect?: SelectionRect | null
@@ -54,7 +54,7 @@ function edgePath(from: CanvasNodeSnapshot, to: CanvasNodeSnapshot): string {
 /** Full-workspace interactive Canvas surface. */
 export function CanvasSurface({
   nodes, windows, edges, viewport, onSelect, onOpen, onDelete, onDraft, onSend, onCancel,
-  onForkSelection = () => {}, renderSessionSlot, onViewport, onResetViewport, selectionRect = null,
+  onBranch, onForkSelection = () => {}, onViewport, onResetViewport, selectionRect = null,
   selectionPending = false, selectionError = null, onClose, t,
 }: CanvasSurfaceProps) {
   const [panning, setPanning] = useState(false)
@@ -76,7 +76,7 @@ export function CanvasSurface({
   }, [])
 
   const pointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    if ((event.target as HTMLElement).closest('button, [role="button"]') !== null) return
+    if ((event.target as HTMLElement).closest('button, [role="button"], [data-loom-session-id]') !== null) return
     event.preventDefault()
     drag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, viewport }
     event.currentTarget.setPointerCapture?.(event.pointerId)
@@ -97,7 +97,6 @@ export function CanvasSurface({
     setPanning(false)
   }
   const wheel = (event: ReactWheelEvent<HTMLDivElement>): void => {
-    event.preventDefault()
     const factor = event.deltaY > 0 ? .9 : 1.1
     onViewport({ ...viewport, scale: viewport.scale * factor })
   }
@@ -146,12 +145,7 @@ export function CanvasSurface({
           onDraft={onDraft}
           onSend={onSend}
           onCancel={onCancel}
-          onForkSelection={onForkSelection}
-          renderSessionSlot={renderSessionSlot}
-          viewportOffset={viewportOffset}
-          selectionRect={selectionRect}
-          selectionPending={selectionPending}
-          selectionError={selectionError}
+          {...(onBranch === undefined ? {} : { onBranch })}
           t={t}
         />}
         {nodes.length > 0 && (
@@ -165,14 +159,22 @@ export function CanvasSurface({
             t={t}
           />
         )}
+        <CanvasSelectionMenu
+          rect={selectionRect}
+          pending={selectionPending}
+          error={selectionError}
+          onSelect={id => { if (id === 'branch') onForkSelection() }}
+          onClose={() => { window.getSelection()?.removeAllRanges() }}
+          t={t}
+        />
       </div>
     </section>
   )
 }
 
 function CanvasWorld({
-  nodes, windows, edges, viewport, onSelect, onOpen, onDelete, onDraft, onSend, onCancel, onForkSelection,
-  renderSessionSlot, viewportOffset, selectionRect, selectionPending, selectionError, t,
+  nodes, windows, edges, viewport, onSelect, onOpen, onDelete, onDraft, onSend, onCancel, onBranch,
+  t,
 }: {
   nodes: readonly CanvasNodeSnapshot[]
   windows: readonly CanvasSessionWindowSnapshot[]
@@ -184,19 +186,21 @@ function CanvasWorld({
   onDraft: (id: SessionId, text: string) => void
   onSend: (id: SessionId) => void
   onCancel: (id: SessionId) => void
-  onForkSelection: () => void
-  renderSessionSlot?: LoomRenderSessionSlot | undefined
-  viewportOffset: ViewportOffset
-  selectionRect: SelectionRect | null
-  selectionPending: boolean
-  selectionError: string | null
+  onBranch?: (id: SessionId, atSeq: number) => Promise<void> | void
   t: TranslateNS<typeof NS>
 }) {
   const byId = new Map(nodes.map(node => [node.id, node]))
   return (
     <div
       className={css.world}
-      style={{ transform: 'translate(' + viewport.x + 'px, ' + viewport.y + 'px) scale(' + viewport.scale + ')' }}
+      // Keep Tooltip's fixed bubble out of a transformed containing block.
+      // `zoom` scales the world without making fixed descendants local to it;
+      // the equivalent origin is placed explicitly in viewport coordinates.
+      style={{
+        left: viewport.x + 96 * viewport.scale,
+        top: viewport.y + 96 * viewport.scale,
+        zoom: viewport.scale,
+      }}
     >
       <svg className={css.edges} width="3200" height="2600" aria-hidden>
         {edges.flatMap(edge => {
@@ -208,7 +212,7 @@ function CanvasWorld({
         })}
       </svg>
       {windows.map(window => (
-        <div className={css.windowPosition} key={window.id} style={{ transform: 'translate(' + window.x + 'px, ' + window.y + 'px)' }}>
+        <div className={css.windowPosition} key={window.id} style={{ left: window.x, top: window.y }}>
           <CanvasSessionWindow
             window={window}
             onSelect={onSelect}
@@ -217,26 +221,16 @@ function CanvasWorld({
             onDraft={onDraft}
             onSend={onSend}
             onCancel={onCancel}
-            renderSessionSlot={renderSessionSlot}
+            {...(onBranch === undefined ? {} : { onBranch })}
             t={t}
           />
         </div>
       ))}
-      <CanvasSelectionMenu
-        rect={selectionRect}
-        viewport={viewport}
-        viewportOffset={viewportOffset}
-        pending={selectionPending}
-        error={selectionError}
-        onSelect={id => { if (id === 'branch') onForkSelection() }}
-        onClose={() => { window.getSelection()?.removeAllRanges() }}
-        t={t}
-      />
     </div>
   )
 }
 
-/** Selection action rendered inside the transformed world so it follows Canvas zoom. */
+/** Selection action rendered in viewport coordinates above the selected text. */
 function SelectionBranchMenu({ rect, anchorScale, className, style, pending, error, onSelect, onClose, t }: {
   rect: SelectionRect | null
   anchorScale: number
@@ -276,7 +270,7 @@ function SelectionBranchMenu({ rect, anchorScale, className, style, pending, err
         open={visible}
         side="top"
         compact
-        anchor={<span className={css.selectionMenuReference} style={{ width: display.rect.width / display.anchorScale, height: display.rect.height / display.anchorScale }} aria-hidden />}
+        anchor={<span className={css.selectionMenuReference} style={{ width: 0, height: 0 }} aria-hidden />}
         items={[{
           id: 'branch',
           label: pending ? t('branching') : t('branch'),
@@ -293,10 +287,8 @@ function SelectionBranchMenu({ rect, anchorScale, className, style, pending, err
   )
 }
 
-function CanvasSelectionMenu({ rect, viewport, viewportOffset, pending, error, onSelect, onClose, t }: {
+function CanvasSelectionMenu({ rect, pending, error, onSelect, onClose, t }: {
   rect: SelectionRect | null
-  viewport: CanvasViewport
-  viewportOffset: ViewportOffset
   pending: boolean
   error: string | null
   onSelect: (id: string) => void
@@ -306,12 +298,9 @@ function CanvasSelectionMenu({ rect, viewport, viewportOffset, pending, error, o
   return (
     <SelectionBranchMenu
       rect={rect}
-      anchorScale={viewport.scale}
-      className={css.selectionMenuAnchor}
-      style={rect === null ? null : {
-        left: (rect.left - viewportOffset.left - viewport.x) / viewport.scale - 96,
-        top: (rect.top - viewportOffset.top - viewport.y) / viewport.scale - 96,
-      }}
+      anchorScale={1}
+      className={css.sessionSelectionMenuAnchor}
+      style={rect === null ? null : { left: rect.left + rect.width / 2, top: rect.top }}
       pending={pending}
       error={error}
       onSelect={onSelect}
@@ -335,7 +324,7 @@ function SessionSelectionMenu({ rect, pending, error, onSelect, onClose, t }: {
       rect={rect}
       anchorScale={1}
       className={css.sessionSelectionMenuAnchor}
-      style={rect === null ? null : { left: rect.left, top: rect.top }}
+      style={rect === null ? null : { left: rect.left + rect.width / 2, top: rect.top }}
       pending={pending}
       error={error}
       onSelect={onSelect}
@@ -347,8 +336,8 @@ function SessionSelectionMenu({ rect, pending, error, onSelect, onClose, t }: {
 
 /** Canvas surface plus the existing text-selection branch menu. */
 export function CanvasOverlay({
-  useLoom, forkSelection, openSession, closeCanvas, deleteSession, selectNode,
-  setViewport, resetViewport, setDraft, sendSession, cancelSession, renderSessionSlot, t,
+  useLoom, forkSelection, forkAt, openSession, closeCanvas, deleteSession, selectNode,
+  setViewport, resetViewport, setDraft, sendSession, cancelSession, t,
 }: LoomChatProps) {
   const snapshot = useLoom(value => value)
   const selection = snapshot.selection
@@ -366,8 +355,8 @@ export function CanvasOverlay({
           onDraft={setDraft}
           onSend={sendSession}
           onCancel={id => { void cancelSession(id) }}
+          onBranch={(id, atSeq) => { void forkAt(id, atSeq) }}
           onForkSelection={() => { void forkSelection() }}
-          renderSessionSlot={renderSessionSlot}
           onViewport={setViewport}
           onResetViewport={resetViewport}
           selectionRect={selection.rect}

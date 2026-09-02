@@ -1,17 +1,9 @@
 import type { InjectFace, PropsLocale, PropsRuntime, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ReactNode } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { CanvasViewport, LoomChatSnapshot } from './controller.js'
 import { NS } from './locales.js'
-
-/** Narrow public host renderer face needed by a Canvas window. */
-export type LoomRenderSessionSlot = (
-  key: 'conversation.composer.full' | 'conversation.session',
-  sessionId: SessionId,
-  owner: { variant: 'composer' | 'canvas'; afterSeq?: number } | Record<string, never>,
-) => ReactNode
 
 /** Browser-owned face for the full-workspace Canvas overlay. */
 export interface LoomChatInjected {
@@ -30,6 +22,8 @@ export interface LoomChatInjected {
   branchSelected: () => Promise<void>
   /** Fork one visible Canvas window without leaving Canvas mode. */
   branchSession: (id: SessionId) => Promise<void>
+  /** Fork one completed assistant message from a Canvas window. */
+  forkAt: (id: SessionId, atSeq: number) => Promise<void>
   /** Update the in-memory Canvas viewport. */
   setViewport: (viewport: CanvasViewport) => void
   /** Restore the default Canvas viewport. */
@@ -53,7 +47,6 @@ export interface LoomCanvasActionInjected {
 export type LoomChatProps =
   & PropsRuntime<'shell.overlay'>
   & InjectFace<LoomChatInjected>
-  & { renderSessionSlot?: LoomRenderSessionSlot }
   & PropsLocale<typeof NS>
 
 /** Full props for the native conversation header Canvas action. */

@@ -1,4 +1,5 @@
-import type { ChatConversationViewNode, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** Durable source information captured by a text-selection popover. */
 export interface SelectionTarget {

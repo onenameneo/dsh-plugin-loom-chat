@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
-import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react'
+import { useState } from 'react'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { CanvasSessionWindowSnapshot } from './controller.js'
-import type { LoomRenderSessionSlot } from './slots.js'
 import type { NS } from './locales.js'
 import { IconNewChatOutline16, IconTrashOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './CanvasOverlay.module.css'
+import { readChatTranscript } from './chat-snapshot.js'
+import { NativeSessionSurface } from './NativeSessionSurface.js'
+import { NativeComposer } from './NativeComposer.js'
 
 interface CanvasSessionWindowProps {
   window: CanvasSessionWindowSnapshot
@@ -16,105 +17,50 @@ interface CanvasSessionWindowProps {
   onDraft: (id: SessionId, text: string) => void
   onSend: (id: SessionId) => void
   onCancel: (id: SessionId) => void
-  renderSessionSlot?: LoomRenderSessionSlot | undefined
+  onBranch?: (id: SessionId, atSeq: number) => Promise<void> | void
   t: TranslateNS<typeof NS>
 }
 
-type DetachedSession = SessionFace & { open?: () => Promise<void> }
-
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : null
+function hasVisibleTranscript(window: CanvasSessionWindowSnapshot): boolean {
+  const sessionSnapshot = window.session?.getSnapshot() as unknown
+  const snapshot = typeof sessionSnapshot === 'object' && sessionSnapshot !== null
+    ? { ...(sessionSnapshot as Record<string, unknown>), chat: window.chatSnapshot }
+    : sessionSnapshot
+  return readChatTranscript(snapshot).some(node => {
+    if (node.kind === 'context' || node.text.length === 0) return false
+    if (window.branchAtSeq === undefined) return true
+    const seq = node.anchorSeq ?? node.seq
+    return seq === undefined || seq > window.branchAtSeq
+  })
 }
 
-function textOf(value: unknown): string {
-  if (typeof value === 'string') return value
-  if (Array.isArray(value)) return value.map(textOf).filter(Boolean).join('')
-  const item = record(value)
-  if (item === null) return ''
-  if (typeof item.text === 'string') return item.text
-  for (const key of ['content', 'blocks', 'message', 'argsRaw', 'summary']) {
-    const text = textOf(item[key])
-    if (text.length > 0) return text
-  }
-  return ''
-}
-
-function nodeText(node: unknown): string {
-  const item = record(node)
-  if (item === null) return ''
-  const text = textOf(item.content ?? item.blocks ?? item.message ?? item)
-  return text.trim()
-}
-
-function nodeKind(node: unknown): string {
-  const kind = record(node)?.kind
-  return typeof kind === 'string' ? kind : 'context'
-}
-
-function transcriptNodes(window: CanvasSessionWindowSnapshot): readonly unknown[] {
-  const snapshot = window.session?.getSnapshot() as unknown
-  const item = record(snapshot)
-  if (item === null) return []
-  if (Array.isArray(item.nodes) && item.nodes.length > 0) return item.nodes
-  const chat = record(item.chat)
-  const nodes = chat?.nodes
-  if (Array.isArray(nodes)) return nodes
-  if (nodes !== null && typeof nodes === 'object' && 'values' in nodes) {
-    const values = (nodes as { values?: unknown }).values
-    if (typeof values === 'function') {
-      const result = values.call(nodes)
-      if (Array.isArray(result)) return result
-      return result !== null && typeof result === 'object' && Symbol.iterator in result
-        ? Array.from(result as Iterable<unknown>)
-        : []
-    }
-  }
-  return []
-}
-
-function stopPropagation(event: ReactMouseEvent<HTMLElement>): void {
-  event.stopPropagation()
+function hasActiveTextSelection(): boolean {
+  const selection = globalThis.window.getSelection()
+  return selection !== null
+    && selection.rangeCount > 0
+    && !selection.isCollapsed
+    && selection.toString().trim().length > 0
 }
 
 /** A compact live transcript and composer for one DSH session in Canvas. */
 export function CanvasSessionWindow({
-  window, onSelect, onOpen, onDelete, onDraft, onSend, onCancel, renderSessionSlot, t,
+  window, onSelect, onOpen, onDelete, onDraft, onSend, onCancel, onBranch, t,
 }: CanvasSessionWindowProps) {
   const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
-  useEffect(() => {
-    const session = window.session as DetachedSession | undefined
-    const open = session?.open
-    if (session === undefined || session.getSnapshot()?.openState === 'open' || open === undefined) return
-    void open.call(session)
-  }, [window.session])
   const inputState = window.inputState ?? window.input?.state?.getSnapshot()
   const running = window.running || inputState?.phase === 'submitting' || inputState?.phase === 'adjudicating'
   const hasBranchReference = window.branchPrompt !== undefined
-  const referenceOnly = hasBranchReference && window.branchContinued !== true
-  const transcript = (referenceOnly ? [] : transcriptNodes(window)).filter(node => {
-    if (window.branchAtSeq === undefined || !hasBranchReference) return true
-    const item = record(node)
-    const seq = item?.anchorSeq ?? item?.seq
-    return typeof seq !== 'number' || seq > window.branchAtSeq
-  })
-  const usesNativeSession = renderSessionSlot !== undefined && !referenceOnly && !window.blank
-  const transcriptClassName = [
-    css.windowTranscript,
-    usesNativeSession ? css.nativeTranscript : '',
-    hasBranchReference && usesNativeSession ? css.referenceNativeTranscript : '',
-    hasBranchReference && usesNativeSession ? css.referenceScrollTranscript : '',
-    referenceOnly ? css.referenceTranscript : '',
-  ].filter(Boolean).join(' ')
+  // A newly-created selection branch starts with only the reference card. Once
+  // its child session has post-boundary history, show that history immediately
+  // even if the async controller has not persisted `branchContinued` yet. A
+  // running child must also mount the native surface so streaming output,
+  // tool steps, and the stop state are visible before the first final node.
+  const referenceOnly = hasBranchReference
+    && window.branchContinued !== true
+    && !running
+    && (window.branchAtSeq === undefined || !hasVisibleTranscript(window))
+  const transcriptClassName = [css.windowTranscript, referenceOnly ? css.referenceTranscript : ''].filter(Boolean).join(' ')
 
-  const submit = (): void => {
-    if (running || inputState?.draft.trim().length === 0) return
-    onSend(window.id)
-  }
-  const keyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key !== 'Enter' || event.shiftKey) return
-    event.preventDefault()
-    submit()
-  }
   const confirmDelete = (): void => {
     setDeleteConfirmationOpen(false)
     void Promise.resolve(onDelete(window.id)).catch(() => {})
@@ -129,8 +75,7 @@ export function CanvasSessionWindow({
       data-selected={window.selected || undefined}
       data-unavailable={window.session === undefined || window.input === undefined || undefined}
       aria-label={window.title}
-      onClick={() => { onSelect(window.id) }}
-      onPointerDown={stopPropagation}
+      onClick={() => { if (!hasActiveTextSelection()) onSelect(window.id) }}
       onWheel={event => { event.stopPropagation() }}
     >
       <header className={css.windowHeader}>
@@ -190,105 +135,32 @@ export function CanvasSessionWindow({
       </header>
       <div
         className={transcriptClassName}
-        onPointerDown={stopPropagation}
         onWheel={event => { event.stopPropagation() }}
       >
         {window.session === undefined ? (
           <p className={css.windowNotice}>{t('loading')}</p>
         ) : (
           <>
-            {hasBranchReference && (
-              <div className={css.message} data-kind="branch-reference">
-                <span className={css.messageRole}>{t('referencePrompt')}</span>
-                <p>{window.branchPrompt}</p>
-              </div>
-            )}
-            {referenceOnly ? null : renderSessionSlot !== undefined && !window.blank ? (
-              <div
-                className={css.nativeSession}
-                data-canvas-density="compact"
-                data-session-content={String(window.id)}
-              >
-                {renderSessionSlot('conversation.session', window.id, {
-                  variant: 'canvas',
-                  ...(window.branchAtSeq === undefined ? {} : { afterSeq: window.branchAtSeq }),
-                })}
-              </div>
-            ) : transcript.length === 0 ? (
-              <p className={css.windowNotice}>{t('canvasEmpty')}</p>
-            ) : transcript.map((node, index) => {
-              const text = nodeText(node)
-              if (text.length === 0) return null
-              const kind = nodeKind(node)
-              return (
-                <div className={css.message} data-kind={kind} key={String(record(node)?.seq ?? index)}>
-                  <span className={css.messageRole}>{kind === 'user' || kind === 'steering' ? 'You' : 'DSH'}</span>
-                  <p>{text}</p>
-                </div>
-              )
-            })}
+          {hasBranchReference && (
+            <aside className={css.branchReference} data-kind="branch-reference" role="note">
+              <span className={css.branchReferenceRole}>{t('referencePrompt')}</span>
+              <p>{window.branchPrompt}</p>
+            </aside>
+          )}
+            {!referenceOnly ? (
+              <NativeSessionSurface
+                window={window}
+                running={running}
+                {...(onBranch === undefined ? {} : { onBranch: atSeq => onBranch(window.id, atSeq) })}
+                t={t}
+              />
+            ) : null}
           </>
         )}
       </div>
-      <footer className={renderSessionSlot === undefined
-        ? css.windowComposer
-        : `${css.windowComposer} ${css.nativeComposerShell}`} onPointerDown={stopPropagation}>
-        {renderSessionSlot === undefined ? (
-          <BasicComposer
-            window={window}
-            inputState={inputState}
-            running={running}
-            onDraft={onDraft}
-            onCancel={onCancel}
-            submit={submit}
-            keyDown={keyDown}
-            t={t}
-          />
-        ) : (
-          <div className={css.nativeComposer} data-session-composer={String(window.id)}>
-            {renderSessionSlot('conversation.composer.full', window.id, { variant: 'composer' })}
-          </div>
-        )}
+      <footer className={css.windowComposer} data-dsh-composer>
+        <NativeComposer window={window} onDraft={onDraft} onSend={onSend} onCancel={onCancel} t={t} />
       </footer>
     </article>
-  )
-}
-
-function BasicComposer({
-  window, inputState, running, onDraft, onCancel, submit, keyDown, t,
-}: {
-  window: CanvasSessionWindowSnapshot
-  inputState: CanvasSessionWindowSnapshot['inputState']
-  running: boolean
-  onDraft: (id: SessionId, text: string) => void
-  onCancel: (id: SessionId) => void
-  submit: () => void
-  keyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void
-  t: TranslateNS<typeof NS>
-}): ReactNode {
-  return (
-    <>
-      <textarea
-        aria-label={t('composerPlaceholder')}
-        className={css.windowTextarea}
-        disabled={window.input === undefined || running}
-        placeholder={t('composerPlaceholder')}
-        value={inputState?.draft ?? ''}
-        onChange={event => { onDraft(window.id, event.currentTarget.value) }}
-        onKeyDown={keyDown}
-      />
-      <div className={css.windowComposerBar}>
-        <span className={css.windowComposerHint}>{window.error ?? (window.pending ? t('pending') : t('pendingContext'))}</span>
-        {running ? (
-          <button type="button" className={css.windowSendButton} onClick={event => { event.stopPropagation(); onCancel(window.id) }}>
-            {t('stop')}
-          </button>
-        ) : (
-          <button type="button" className={css.windowSendButton} disabled={inputState?.draft.trim().length === 0 || window.input === undefined} onClick={event => { event.stopPropagation(); submit() }}>
-            {t('send')}
-          </button>
-        )}
-      </div>
-    </>
   )
 }

@@ -5,7 +5,7 @@ import css from './LoomBranchAction.module.css'
 
 /** Adds a native-session header action that reopens the Loom Canvas. */
 export function LoomCanvasAction({ sessionId, useLoom, openCanvas, t }: LoomCanvasActionProps) {
-  const visible = useLoom(snapshot => snapshot.nodes.some(node => node.id === sessionId) && snapshot.mode !== 'canvas')
+  const visible = useLoom(snapshot => snapshot?.nodes?.some(node => node.id === sessionId) === true && snapshot.mode !== 'canvas')
   if (!visible) return null
   return (
     <Tooltip label={t('openCanvas')} side="bottom">

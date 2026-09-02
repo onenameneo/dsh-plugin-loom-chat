@@ -4,7 +4,7 @@ import { cleanup, createEvent, fireEvent, render } from '@testing-library/react'
 import { CanvasOverlay, CanvasSurface } from '../src/client/CanvasOverlay.js'
 import type { CanvasNodeSnapshot, CanvasSessionWindowSnapshot, CanvasViewport } from '../src/client/controller.js'
 import type { LoomChatSnapshot } from '../src/client/controller.js'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { en } from '../src/client/locales.js'
 
 afterEach(cleanup)
@@ -38,10 +38,49 @@ function node(id: string, overrides: Partial<CanvasNodeSnapshot> = {}): CanvasNo
 const viewport: CanvasViewport = { x: 0, y: 0, scale: 1 }
 
 function windowSnapshot(value: CanvasNodeSnapshot): CanvasSessionWindowSnapshot {
-  return { ...value, session: undefined, input: undefined, inputState: undefined }
+  return {
+    ...value,
+    session: {
+      getSnapshot: () => ({
+        chat: {
+          nodes: new Map([
+            ['assistant', { kind: 'assistant', seq: 7, blocks: [{ kind: 'text', text: 'Canvas answer' }] }],
+          ]),
+        },
+      }),
+      subscribe: vi.fn(() => () => {}),
+    } as never,
+    input: undefined,
+    inputState: undefined,
+  }
 }
 
 describe('CanvasSurface', () => {
+  it('passes the assistant branch action through the Canvas surface', () => {
+    const onBranch = vi.fn()
+    const ui = render(
+      <CanvasSurface
+        nodes={[node('root')]}
+        windows={[windowSnapshot(node('root'))]}
+        edges={[]}
+        viewport={viewport}
+        onSelect={vi.fn()}
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+        onDraft={vi.fn()}
+        onSend={vi.fn()}
+        onCancel={vi.fn()}
+        onBranch={onBranch}
+        onViewport={vi.fn()}
+        onResetViewport={vi.fn()}
+        t={t}
+      />,
+    )
+
+    fireEvent.click(ui.getByRole('button', { name: 'Branch into Loom Chat' }))
+    expect(onBranch).toHaveBeenCalledWith('root', 7)
+  })
+
   it('renders lineage nodes and edges in a full-workspace surface', () => {
     const ui = render(
       <CanvasSurface
@@ -191,7 +230,63 @@ describe('CanvasSurface', () => {
     expect(preventDefault).toHaveBeenCalledOnce()
   })
 
-  it('renders the selection action inside the scaled Canvas world', () => {
+  it('zooms on Canvas wheel without preventing a passive React wheel event', () => {
+    const onViewport = vi.fn()
+    const ui = render(
+      <CanvasSurface
+        nodes={[node('root')]}
+        windows={[windowSnapshot(node('root'))]}
+        edges={[]}
+        viewport={{ x: 0, y: 0, scale: 1 }}
+        onSelect={vi.fn()}
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+        onDraft={vi.fn()}
+        onSend={vi.fn()}
+        onCancel={vi.fn()}
+        onViewport={onViewport}
+        onResetViewport={vi.fn()}
+        t={t}
+      />,
+    )
+    const surface = ui.container.querySelector('[class*="viewport"]') as HTMLElement
+    const event = createEvent.wheel(surface, { deltaY: -100 })
+    const preventDefault = vi.spyOn(event, 'preventDefault')
+    fireEvent(surface, event)
+
+    expect(preventDefault).not.toHaveBeenCalled()
+    expect(onViewport).toHaveBeenCalledWith({ x: 0, y: 0, scale: 1.1 })
+  })
+
+  it('lets document-level popup handlers see pointerdowns inside a chat window', () => {
+    const ui = render(
+      <CanvasSurface
+        nodes={[node('root')]}
+        windows={[windowSnapshot(node('root'))]}
+        edges={[]}
+        viewport={viewport}
+        onSelect={vi.fn()}
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+        onDraft={vi.fn()}
+        onSend={vi.fn()}
+        onCancel={vi.fn()}
+        onViewport={vi.fn()}
+        onResetViewport={vi.fn()}
+        t={t}
+      />,
+    )
+    const listener = vi.fn()
+    document.addEventListener('pointerdown', listener)
+    try {
+      fireEvent.pointerDown(ui.getByRole('article', { name: 'root' }))
+      expect(listener).toHaveBeenCalledOnce()
+    } finally {
+      document.removeEventListener('pointerdown', listener)
+    }
+  })
+
+  it('renders the selection action in viewport coordinates outside the scaled Canvas world', () => {
     const onForkSelection = vi.fn()
     const ui = render(
       <CanvasSurface
@@ -214,13 +309,49 @@ describe('CanvasSurface', () => {
         t={t}
       />,
     )
-    const anchor = ui.container.querySelector('[class*="selectionMenuAnchor"]') as HTMLElement
-    expect(anchor.style.left).toBe('144px')
-    expect(anchor.style.top).toBe('157.33333333333334px')
+    const world = ui.container.querySelector('[class*="world"]') as HTMLElement
+    expect(world.querySelector('[data-loom-selection-menu]')).toBeNull()
+    const anchor = ui.container.querySelector('[class*="sessionSelectionMenuAnchor"]') as HTMLElement
+    expect(anchor.style.left).toBe('240px')
+    expect(anchor.style.top).toBe('220px')
+    const reference = ui.container.querySelector('[class*="selectionMenuReference"]') as HTMLElement
+    expect(reference.style.width).toBe('0px')
+    expect(reference.style.height).toBe('0px')
     const menuItem = ui.getByRole('menuitem', { name: 'Ask in branch' })
     expect(menuItem.querySelector('[data-loom-canvas-icon]')).not.toBeNull()
     fireEvent.click(menuItem)
     expect(onForkSelection).toHaveBeenCalledOnce()
+  })
+
+  it('keeps default fixed tooltips out of transformed Canvas ancestors', () => {
+    const ui = render(
+      <CanvasSurface
+        nodes={[node('root')]}
+        windows={[windowSnapshot(node('root'))]}
+        edges={[]}
+        viewport={{ x: 20, y: 30, scale: 0.75 }}
+        onSelect={vi.fn()}
+        onOpen={vi.fn()}
+        onDelete={vi.fn()}
+        onDraft={vi.fn()}
+        onSend={vi.fn()}
+        onCancel={vi.fn()}
+        onBranch={vi.fn()}
+        onViewport={vi.fn()}
+        onResetViewport={vi.fn()}
+        t={t}
+      />,
+    )
+
+    const world = ui.container.querySelector('[class*="world"]') as HTMLElement
+    const windowPosition = ui.container.querySelector('[class*="windowPosition"]') as HTMLElement
+    expect(world.style.transform).toBe('')
+    expect(world.style.left).toBe('92px')
+    expect(world.style.top).toBe('102px')
+    expect(world.style.zoom).toBe('0.75')
+    expect(windowPosition.style.transform).toBe('')
+    expect(windowPosition.style.left).toBe('0px')
+    expect(windowPosition.style.top).toBe('0px')
   })
 
   it('shows the selection branch action in native session mode', () => {
@@ -245,9 +376,11 @@ describe('CanvasSurface', () => {
       <CanvasOverlay
         useLoom={useLoom}
         useSessions={vi.fn() as never}
+        useSessionPendingInteraction={vi.fn() as never}
         useWorkspaces={vi.fn() as never}
         forkSelection={onForkSelection}
         branchSelected={vi.fn()}
+        forkAt={vi.fn()}
         openSession={vi.fn()}
         closeCanvas={vi.fn()}
         deleteSession={vi.fn()}
@@ -262,6 +395,12 @@ describe('CanvasSurface', () => {
       />,
     )
 
+    const anchor = ui.container.querySelector('[class*="sessionSelectionMenuAnchor"]') as HTMLElement
+    expect(anchor.style.left).toBe('160px')
+    expect(anchor.style.top).toBe('220px')
+    const reference = ui.container.querySelector('[class*="selectionMenuReference"]') as HTMLElement
+    expect(reference.style.width).toBe('0px')
+    expect(reference.style.height).toBe('0px')
     fireEvent.click(ui.getByRole('menuitem', { name: 'Ask in branch' }))
     expect(onForkSelection).toHaveBeenCalledOnce()
   })

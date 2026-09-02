@@ -50,6 +50,7 @@ dsh plugin --profile web remove dsh-loom-chat
 它适合需要围绕一个问题同时探索多个方向的场景：保留主会话作为上下文起点，把新的问题分支到独立会话中，并在画布上同时查看各条探索路径。
 
 - 画布中的每个会话窗口都可以直接阅读历史、编辑输入、发送消息和停止生成。
+- Canvas 的 transcript 和消息渲染完全由本插件实现，支持文本/Markdown、代码、思考、工具和状态摘要、命令、上下文、附件引用；遇到未知的数据结构时也会显示可读的 fallback。
 - 从消息或选中文字发起分支时，子会话继承 DSH 分岔边界前的上下文；选中文字会以引用内容保留在子会话顶部。
 - 子会话之间互相独立，支持继续创建更深层级的分支，不复制渲染后的消息，也不自动同步后续内容。
 - 需要完整附件、斜杠命令、模型选择或 Plan 能力时，可以从窗口进入 DSH 原生单会话模式。
@@ -98,11 +99,14 @@ Canvas 窗口使用 DSH 公开的 session face 和每会话 input face。它是�
 
 ## 宿主边界
 
-插件不修改 DSH 原生侧边栏、`ui-workspace` 或主会话渲染器。Canvas 使用公开的 session/runtime 与 `shell.overlay` Slot；每个脱离当前选择的 Canvas 窗口都通过 `session.open()` 加载自己的历史，不改变当前会话；单会话模式通过 `ctx.sessions.open()` 交回宿主会话界面。
+插件不修改 DSH 原生侧边栏、`ui-workspace` 或主会话渲染器。Canvas 使用公开的 session/runtime 与 `shell.overlay` Slot；脱离当前选择且尚未加载历史的窗口，会由插件串行调用 `ctx.sessions.open()` 临时完成公开历史 hydration，然后恢复用户之前的当前会话。Canvas 不调用宿主私有 renderer，也不依赖窗口级 `session.open()`。单会话模式通过 `ctx.sessions.open()` 交回宿主会话界面。
+
+Canvas 不承诺在每个窗口内复刻宿主的完整 Composer。附件、斜杠命令、模型选择、Plan 等宿主专属控件，请打开窗口进入原生单会话模式使用。
 
 ## 兼容性
 
 - 需要使用 DSH Web profile，以及公开的 session、runtime、conversation、workspace 和 UI slot 能力。
+- DSH 包版本线为 `0.1.x`，当前使用并验证的是一致的 `0.1.0-rc.7` 公开包集合；peer dependency 上限为 `<0.2.0`。
 - 插件依赖 DSH 当前的开发预览 API；随着 DSH 演进，兼容性可能发生变化。
 - 本地开发和构建需要 Node.js `^22.19.0` 或 `>=24.0.0`，以及 pnpm `11.7.0`。
 
@@ -120,7 +124,7 @@ pnpm pack --pack-destination ./.artifacts
 
 ```sh
 DSH_HOME=/tmp/dsh-loom-chat-profile \
-  dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.2.tgz"
+  dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.3.tgz"
 ```
 
 ## 发布 npm

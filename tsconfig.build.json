@@ -9,6 +9,12 @@
     "sourceMap": true,
     "types": ["node", "react", "react-dom"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": [
+    "src/index.ts",
+    "src/invariant.ts",
+    "src/client/index.ts",
+    "src/css-modules.d.ts",
+    "src/vendor/dsh-harness-optional-modules.d.ts"
+  ],
   "exclude": ["tests", "lib", "node_modules"]
 }

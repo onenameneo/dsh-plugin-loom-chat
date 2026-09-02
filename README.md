@@ -50,6 +50,7 @@ The plugin contributes to the `web` profile only; it does not modify the DSH nat
 It is designed for exploring several directions around one question: keep the main session as the context origin, fork new questions into independent sessions, and inspect the resulting paths together on the canvas.
 
 - Every Canvas window can read its transcript, edit its draft, send a message, and stop generation independently.
+- Canvas transcript rendering is owned by this plugin: it displays text/Markdown, code, reasoning, tool and status summaries, commands, context, attachment references, and readable fallbacks for unknown content shapes.
 - A message or text selection can start a branch. The child inherits the DSH context before the fork boundary, while selected text remains as a reference card at the top of the child session.
 - Child sessions are independent and can branch to unlimited depth. The plugin does not copy rendered messages or synchronize later messages automatically.
 - Use native single-session mode when you need the full host composer, including attachments, slash commands, model selection, or Plan controls.
@@ -98,11 +99,14 @@ For the minimal Cordis plugin structure, see [Your first plugin](https://github.
 
 ## Host boundary
 
-The plugin does not modify DSH's native sidebar, `ui-workspace`, or the main conversation renderer. Canvas uses the public session/runtime APIs and `shell.overlay`; each detached Canvas window calls `session.open()` to load its own history without changing the current session. Single-session mode returns control to the host with `ctx.sessions.open()`.
+The plugin does not modify DSH's native sidebar, `ui-workspace`, or the main conversation renderer. Canvas uses the public session/runtime APIs and `shell.overlay`; when a detached window is cold, the plugin temporarily stages it through `ctx.sessions.open()` to hydrate public history, serializes those requests, and restores the user's previous current session. Canvas never calls private host renderers or a per-window `session.open()` method. Single-session mode returns control to the host with `ctx.sessions.open()`.
+
+Canvas deliberately does not promise the host's full Composer inside every window. Attachments, slash commands, model selection, Plan controls, and other host-specific controls remain available after opening a window in native single-session mode.
 
 ## Compatibility
 
 - DSH Web profile with the public session, runtime, conversation, workspace, and UI slot APIs.
+- DSH package line `0.1.x`, tested against the aligned `0.1.0-rc.7` public package set; the peer dependency range is `<0.2.0`.
 - The plugin follows the DSH developer-preview APIs; compatibility can change as DSH evolves.
 - Local development and package builds require Node.js `^22.19.0` or `>=24.0.0` and pnpm `11.7.0`.
 
@@ -120,7 +124,7 @@ Test a packed plugin in a temporary profile:
 
 ```sh
 DSH_HOME=/tmp/dsh-loom-chat-profile \
-  dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.2.tgz"
+  dsh plugin --profile web add "$PWD/.artifacts/dsh-loom-chat-0.1.0-rc.3.tgz"
 ```
 
 ## Publishing

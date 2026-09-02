@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ISessions, SessionFace, SessionId, SessionListState } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ISessions, SessionFace, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { LoomChatController } from '../src/client/controller.js'
 
 afterEach(() => { vi.restoreAllMocks() })
@@ -85,6 +86,175 @@ describe('LoomChatController Canvas flow', () => {
     expect(inputs.get('child')?.setDraft).toHaveBeenCalledWith('continue here')
     expect(inputs.get('child')?.submit).toHaveBeenCalled()
     expect(sessions.binding('child' as SessionId)?.session.cancel).toHaveBeenCalled()
+    controller.dispose()
+  })
+
+  it('clears the submitted draft after the input face accepts it', () => {
+    const sessions = sessionsFixture()
+    let draft = 'send this from Canvas'
+    const input = {
+      setDraft: vi.fn((text: string) => { draft = text }),
+      submit: vi.fn(),
+      state: {
+        getSnapshot: () => ({ draft, phase: 'plain' as const }),
+        subscribe: () => () => {},
+      },
+    }
+    const controller = new LoomChatController(sessions, () => input as never)
+
+    controller.openCanvas()
+    controller.sendSession('root' as SessionId)
+
+    expect(input.submit).toHaveBeenCalledOnce()
+    expect(input.setDraft).toHaveBeenLastCalledWith('')
+    expect(draft).toBe('')
+    controller.dispose()
+  })
+
+  it('synchronizes a Canvas draft through the ordinary input face', () => {
+    const sessions = sessionsFixture()
+    const input = {
+      setDraft: vi.fn(),
+      submit: vi.fn(),
+      state: { getSnapshot: () => ({ draft: '', phase: 'plain' as const }), subscribe: () => () => {} },
+    }
+    const controller = new LoomChatController(sessions, () => input as never)
+
+    controller.openCanvas()
+    controller.setDraft('root' as SessionId, 'canvas-only draft')
+
+    expect(input.setDraft).toHaveBeenCalledWith('canvas-only draft')
+    controller.dispose()
+  })
+
+  it('hydrates cold detached sessions through public staging and restores the current session', async () => {
+    const sessions = sessionsFixture()
+    const coldSnapshot = {
+      sessionId: 'child' as SessionId,
+      chat: { nodes: new Map() },
+      nodes: [],
+      turnEnds: new Map([[1, 12]]),
+      running: false,
+      openState: 'cold' as 'cold' | 'open',
+    }
+    const coldSession = {
+      getSnapshot: () => coldSnapshot,
+      subscribe: vi.fn(() => () => {}),
+    } as never as SessionFace
+    const rootSession = sessions.binding('root' as SessionId)?.session
+    ;(sessions as never as { binding: (id: SessionId) => unknown }).binding = (id: SessionId) => ({
+      sessionId: id,
+      session: id === 'child' ? coldSession : rootSession,
+      ctx: undefined,
+    })
+    ;(sessions.open as ReturnType<typeof vi.fn>).mockImplementation((id: SessionId) => {
+      sessions.state.value.current = id
+      if (id === 'child') coldSnapshot.openState = 'open'
+    })
+    const controller = new LoomChatController(sessions)
+
+    controller.openCanvas()
+    await new Promise(resolve => { setTimeout(resolve, 0) })
+
+    expect(sessions.open).toHaveBeenNthCalledWith(1, 'child')
+    expect(sessions.open).toHaveBeenNthCalledWith(2, 'root')
+    expect(sessions.state.value.current).toBe('root')
+    expect(controller.getSnapshot().windows.find(window => window.id === 'child')?.session).toBe(coldSession)
+    controller.dispose()
+  })
+
+  it('opens cold sessions through the bound Session face without changing native selection', async () => {
+    const sessions = sessionsFixture()
+    const coldSnapshot = {
+      sessionId: 'child' as SessionId,
+      chat: { nodes: new Map() },
+      nodes: [],
+      turnEnds: new Map([[1, 12]]),
+      running: false,
+      openState: 'cold' as 'cold' | 'open',
+    }
+    const open = vi.fn(async () => { coldSnapshot.openState = 'open' })
+    const coldSession = {
+      getSnapshot: () => coldSnapshot,
+      subscribe: vi.fn(() => () => {}),
+      open,
+    } as never as SessionFace
+    const rootSession = sessions.binding('root' as SessionId)?.session
+    ;(sessions as never as { binding: (id: SessionId) => unknown }).binding = (id: SessionId) => ({
+      sessionId: id,
+      session: id === 'child' ? coldSession : rootSession,
+      ctx: undefined,
+    })
+    const controller = new LoomChatController(sessions)
+
+    controller.openCanvas()
+    await new Promise(resolve => { setTimeout(resolve, 0) })
+
+    expect(open).toHaveBeenCalledOnce()
+    expect(sessions.open).not.toHaveBeenCalled()
+    expect(sessions.state.value.current).toBe('root')
+    controller.dispose()
+  })
+
+  it('hydrates a cold session that appears after Canvas has already opened', async () => {
+    const sessions = sessionsFixture()
+    let notifyList = (): void => {}
+    ;(sessions.list as never as { subscribe: (listener: () => void) => () => void }).subscribe = (listener) => {
+      notifyList = listener
+      return () => {}
+    }
+    const childSnapshot = {
+      sessionId: 'child' as SessionId,
+      chat: { nodes: new Map() },
+      nodes: [],
+      turnEnds: new Map([[1, 12]]),
+      running: false,
+      openState: 'cold' as 'cold' | 'open',
+    }
+    const childSession = {
+      getSnapshot: () => childSnapshot,
+      subscribe: vi.fn(() => () => {}),
+    } as never as SessionFace
+    const rootSession = sessions.binding('root' as SessionId)?.session
+    ;(sessions as never as { binding: (id: SessionId) => unknown }).binding = (id: SessionId) => ({
+      sessionId: id,
+      session: id === 'child' ? childSession : rootSession,
+      ctx: undefined,
+    })
+    const controller = new LoomChatController(sessions)
+
+    sessions.state.value.ids = ['root'] as SessionId[]
+    controller.openCanvas()
+    sessions.state.value.ids = ['root', 'child'] as SessionId[]
+    notifyList()
+    ;(sessions.open as ReturnType<typeof vi.fn>).mockImplementation((id: SessionId) => {
+      sessions.state.value.current = id
+      if (id === 'child') childSnapshot.openState = 'open'
+    })
+    await new Promise(resolve => { setTimeout(resolve, 0) })
+
+    expect(sessions.open).toHaveBeenCalledWith('child')
+    expect(childSnapshot.openState).toBe('open')
+    controller.dispose()
+  })
+
+  it('keeps a failed submit error attached to its own Canvas window', () => {
+    const sessions = sessionsFixture()
+    const inputs = new Map<string, {
+      setDraft: ReturnType<typeof vi.fn>
+      submit: ReturnType<typeof vi.fn>
+      state: { getSnapshot: () => { draft: string; phase: 'plain' }; subscribe: () => () => void }
+    }>([
+      ['root', { setDraft: vi.fn(), submit: vi.fn(), state: { getSnapshot: () => ({ draft: '', phase: 'plain' as const }), subscribe: () => () => {} } }],
+      ['child', { setDraft: vi.fn(), submit: vi.fn(() => { throw new Error('child submit failed') }), state: { getSnapshot: () => ({ draft: 'retry', phase: 'plain' as const }), subscribe: () => () => {} } }],
+    ])
+    const controller = new LoomChatController(sessions, id => inputs.get(String(id)) as never)
+
+    controller.openCanvas()
+    controller.sendSession('child' as SessionId)
+
+    expect(controller.getSnapshot().windows.find(window => window.id === 'child')?.error).toBe('child submit failed')
+    expect(controller.getSnapshot().windows.find(window => window.id === 'root')?.error).toBeNull()
     controller.dispose()
   })
 

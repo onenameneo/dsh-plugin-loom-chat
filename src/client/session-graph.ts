@@ -1,5 +1,5 @@
-import type { SessionId, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
-import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** A user-visible ordinary session projected as a Canvas node. */
 export interface SessionGraphNode {
@@ -119,7 +119,7 @@ export function buildSessionGraph(summaries: readonly SessionSummary[]): Session
       x: depth * NODE_X_GAP,
       y: row * NODE_Y_GAP,
       running: summary.running,
-      pending: summary.pendingInteraction !== undefined,
+      pending: false,
       completed: summary.completed === true,
       blank: summary.blank,
       updatedAt: summary.updatedAt,
@@ -144,13 +144,14 @@ export function buildSessionGraph(summaries: readonly SessionSummary[]): Session
  * @param snapshot - DSH session snapshot.
  * @returns a completed turn-end sequence, or undefined while no safe boundary exists.
  */
-export function latestStableBoundary(snapshot: Pick<ConversationSnapshot, 'turnEnds' | 'running'> | null | undefined): number | undefined {
-  const turnEnds = snapshot?.turnEnds
-  if (snapshot?.running || turnEnds == null || typeof turnEnds.size !== 'number' || turnEnds.size === 0) return undefined
-  if (typeof turnEnds.values !== 'function') return undefined
+export function latestStableBoundary(snapshot: unknown): number | undefined {
+  const value = snapshot as { running?: unknown; turnEnds?: unknown; chat?: { legacy?: { turnEnds?: unknown } } } | null | undefined
+  const turnEnds = value?.turnEnds ?? value?.chat?.legacy?.turnEnds
+  if (value?.running === true || turnEnds == null || typeof (turnEnds as { size?: unknown }).size !== 'number' || (turnEnds as { size: number }).size === 0) return undefined
+  if (typeof (turnEnds as { values?: unknown }).values !== 'function') return undefined
   let latest: number | undefined
-  for (const value of turnEnds.values()) {
-    if (typeof value === 'number' && Number.isFinite(value) && (latest === undefined || value > latest)) latest = value
+  for (const item of (turnEnds as { values: () => Iterable<unknown> }).values()) {
+    if (typeof item === 'number' && Number.isFinite(item) && (latest === undefined || item > latest)) latest = item
   }
   return latest
 }

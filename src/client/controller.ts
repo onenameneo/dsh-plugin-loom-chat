@@ -1,4 +1,7 @@
-import type { ISessions, IWorkspaces, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ISessions, SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { ChatConversationViewNode } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   buildSessionGraph, CANVAS_WINDOW_HEIGHT, CANVAS_WINDOW_WIDTH, latestStableBoundary,
@@ -7,12 +10,27 @@ import type { SessionGraphEdge, SessionGraphNode } from './session-graph.js'
 import { resolveSelectionTarget } from './selection-target.js'
 import type { SelectionTarget } from './selection-target.js'
 import { buildSelectionPrompt } from './selection-prompt.js'
+import { readChatTranscript } from './chat-snapshot.js'
+import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
+import type { InputTriggerController } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { UiConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 
 /** Minimal input face needed by the Canvas and selection branch flows. */
 export interface LoomSessionInput {
-  setDraft(text: string): void
+  setDraft(text: string, editRange?: { start: number; end: number; insertedLength: number }): void
+  addImages?(ids: readonly unknown[]): boolean
+  removeImage?(id: unknown): void
+  pruneImages?(ids: readonly unknown[]): void
   submit?(): void
   state?: HostObservable<LoomInputState>
+  createDraftImages?(files: readonly File[]): readonly unknown[]
+  draftImages?(ids: readonly unknown[]): readonly unknown[]
+  releaseDraftImages?(attachments: readonly unknown[]): void
+  resolveImage?(attachment: unknown): Promise<string>
+  /** Host-owned model directory and selector operations for this session. */
+  model?: ModelSelectInjected
+  /** Host-owned slash command controller used by the native MenuView. */
+  inputTriggers?: InputTriggerController
 }
 
 /** Stable input state projection consumed by a Canvas composer. */
@@ -49,6 +67,8 @@ export interface CanvasNodeSnapshot extends SessionGraphNode {
 /** One directly interactive Canvas window bound to one DSH session. */
 export interface CanvasSessionWindowSnapshot extends CanvasNodeSnapshot {
   session: SessionFace | undefined
+  /** Current host Chat target snapshot; kept separate from Session lifecycle state in alpha4. */
+  chatSnapshot?: unknown
   input: LoomSessionInput | undefined
   inputState: LoomInputState | undefined
   /** Plugin-owned prompt shown instead of inherited history for a selection branch. */
@@ -223,26 +243,25 @@ function record(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null ? value as Record<string, unknown> : null
 }
 
-function textFromUserNode(node: unknown): string {
-  const item = record(node)
-  const data = record(item?.data)
-  const content = data?.content
-  if (!Array.isArray(content)) return ''
-  return content.map(block => {
-    const part = record(block)
-    return part?.type === 'text' && typeof part.text === 'string' ? part.text : ''
-  }).join('').trim()
+function chatNodeAt(snapshot: unknown, key: string): ChatConversationViewNode | undefined {
+  const item = record(snapshot)
+  const chat = record(item?.chat)
+  const nodes = record(chat?.nodes)
+  const get = nodes?.get
+  if (typeof get !== 'function') return undefined
+  const node = get.call(chat?.nodes, key) as ChatConversationViewNode | undefined
+  if (node === undefined || node.key === key) return node
+  // Released snapshots may keep the stable node key only in the ordered map.
+  // Add it back at the public adapter boundary so Canvas selection can use the
+  // same validation path as the host conversation renderer.
+  return { ...node, key }
 }
 
-function firstUserPromptAfter(session: SessionFace, atSeq: number): string | undefined {
-  const snapshot = session.getSnapshot()
-  const chat = snapshot?.chat
-  if (chat === undefined || !Array.isArray(chat.order) || chat.nodes === undefined) return undefined
-  for (const key of chat.order) {
-    const node = chat.nodes.get(key)
-    if (node?.kind !== 'user' || node.anchorSeq <= atSeq) continue
-    const prompt = textFromUserNode(node)
-    if (prompt.length > 0) return prompt
+function firstUserPromptAfter(snapshot: unknown, atSeq: number): string | undefined {
+  for (const node of readChatTranscript(snapshot)) {
+    const seq = node.anchorSeq ?? node.seq
+    if (node.kind !== 'user' || seq === undefined || seq <= atSeq) continue
+    if (node.text.length > 0) return node.text
   }
   return undefined
 }
@@ -299,6 +318,8 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
   private readonly disposeWorkspaces: (() => void) | undefined
   private disposed = false
   private operationSeq = 0
+  private hydrationQueue: Promise<void> = Promise.resolve()
+  private readonly hydrating = new Set<SessionId>()
 
   /**
    * @param sessions - public DSH session list, selection, binding, and fork face.
@@ -308,6 +329,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     private readonly sessions: ISessions,
     private readonly inputFor?: (sessionId: SessionId) => LoomSessionInput | undefined,
     private readonly workspaces?: IWorkspaces,
+    private readonly uiConversation?: UiConversation,
   ) {
     this.disposeList = sessions.list.subscribe(() => { this.reconcile() })
     this.disposeWorkspaces = workspaces?.list.subscribe(() => { this.reconcile() })
@@ -332,6 +354,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     }
     this.mode = 'canvas'
     this.publish()
+    this.queueDetachedHydration()
   }
 
   /** Leave Canvas and reopen the session that was active before Canvas. */
@@ -364,11 +387,9 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     this.publish()
   }
 
-  /** Update one Canvas window's draft without touching another session. */
+  /** Keep the Canvas composer and ordinary composer on the same host draft. */
   setDraft(sessionId: SessionId, text: string): void {
-    const input = this.inputFor?.(sessionId)
-    if (input === undefined) return
-    input.setDraft(text)
+    this.inputFor?.(sessionId)?.setDraft(text)
   }
 
   /** Submit the current draft belonging to exactly one Canvas window. */
@@ -386,6 +407,11 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
         input.setDraft(text)
       }
       input.submit()
+      // The input machine keeps a submitting draft visible for ordinary
+      // composer recovery. Canvas has already handed the draft to submit,
+      // so clear it after acceptance to leave the Canvas editor ready for
+      // the next message. Failed submits stay intact for retry via catch.
+      input.setDraft('')
       const summary = this.sessions.list.getSnapshot().byId[sessionId]
       const session = this.sessions.binding(sessionId)?.session
       if (summary?.parentId !== undefined && session !== undefined) this.deriveBranchTitle(sessionId, userPrompt)
@@ -416,7 +442,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
   async branchSession(sessionId: SessionId): Promise<void> {
     const binding = this.sessions.binding(sessionId)
     if (binding === undefined) throw new Error(`session ${sessionId} is unavailable`)
-    const atSeq = latestStableBoundary(binding.session.getSnapshot())
+    const atSeq = latestStableBoundary(this.snapshotFor(sessionId, binding.session))
     if (atSeq === undefined) throw new Error(`session ${sessionId} has no stable fork boundary`)
     const operation = ++this.operationSeq
     try {
@@ -457,7 +483,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     if (id === undefined) throw new Error('no session selected')
     const binding = this.sessions.binding(id)
     if (binding === undefined) throw new Error(`session ${id} is unavailable`)
-    const atSeq = latestStableBoundary(binding.session.getSnapshot())
+    const atSeq = latestStableBoundary(this.snapshotFor(id, binding.session))
     if (atSeq === undefined) throw new Error(`session ${id} has no stable fork boundary`)
     await this.forkAndCanvas(id, atSeq)
   }
@@ -631,7 +657,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       text: selection.toString(),
       flowKey,
       flowKind,
-      node: flowKey === undefined ? undefined : session?.getSnapshot()?.chat?.nodes?.get(flowKey),
+      node: flowKey === undefined || session === undefined ? undefined : chatNodeAt(this.snapshotFor(sessionId!, session), flowKey),
     })
     this.selectionTarget = target
     this.selectionRect = target === null ? null : this.rectOf(range)
@@ -663,6 +689,35 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
 
   private activeOperation(operation: number): boolean {
     return !this.disposed && this.operationSeq === operation
+  }
+
+  /** Combine the alpha4 Session lifecycle snapshot with the target-neutral Chat view. */
+  private snapshotFor(sessionId: SessionId, session: SessionFace): unknown {
+    const base = session.getSnapshot()
+    if (this.uiConversation === undefined) return base
+    try {
+      return { ...base, chat: this.uiConversation.binding(sessionId).target('chat').getSnapshot() }
+    } catch {
+      return base
+    }
+  }
+
+  private chatSnapshotFor(sessionId: SessionId): unknown {
+    if (this.uiConversation === undefined) return undefined
+    try {
+      return this.uiConversation.binding(sessionId).target('chat').getSnapshot()
+    } catch {
+      return undefined
+    }
+  }
+
+  private chatSourceFor(sessionId: SessionId): HostObservable<unknown> | undefined {
+    if (this.uiConversation === undefined) return undefined
+    try {
+      return this.uiConversation.binding(sessionId).target('chat')
+    } catch {
+      return undefined
+    }
   }
 
   private reconcile(): void {
@@ -699,21 +754,96 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       const input = this.inputFor?.(node.id)
       const disposers = [
         ...(session === undefined ? [] : [session.subscribe(() => { this.publish() })]),
+        ...(this.chatSourceFor(node.id) === undefined ? [] : [this.chatSourceFor(node.id)!.subscribe(() => { this.publish() })]),
         ...(input?.state === undefined ? [] : [input.state.subscribe(() => { this.publish() })]),
       ]
       if (disposers.length > 0) this.sessionUnsubs.set(node.id, () => { for (const dispose of disposers) dispose() })
     }
     this.publish()
+    if (this.mode === 'canvas') this.queueDetachedHydration()
+  }
+
+  /** Stage cold sessions one at a time so their public history bindings hydrate. */
+  private queueDetachedHydration(): void {
+    for (const summary of this.visibleSummaries()) {
+      const binding = this.sessions.binding(summary.id)
+      const openState = binding?.session.getSnapshot()?.openState as string | undefined
+      if (openState !== 'cold' || this.hydrating.has(summary.id)) continue
+      this.hydrating.add(summary.id)
+      this.hydrationQueue = this.hydrationQueue
+        .catch(() => {})
+        .then(() => this.hydrateDetached(summary.id))
+        .finally(() => { this.hydrating.delete(summary.id) })
+    }
+  }
+
+  /** Hydrate one cold detached session without stealing native selection. */
+  private async hydrateDetached(id: SessionId): Promise<void> {
+    const session = this.sessions.binding(id)?.session
+    if (session === undefined || (session.getSnapshot()?.openState as string | undefined) !== 'cold') return
+    const previous = this.sessions.list.getSnapshot().current
+    const open = (session as SessionFace & { open?: () => Promise<void> }).open
+    const usesSelectionFallback = open === undefined
+    try {
+      // `sessions.open(id)` changes the native selected session but does not
+      // pull a cold session's history. The bound Session instance owns that
+      // operation. Keep the selection fallback for older host runtimes that
+      // do not expose Session.open on their binding object.
+      if (open !== undefined) await open.call(session)
+      else this.sessions.open(id)
+      await this.waitForSessionOpen(session)
+      this.publish()
+    } catch (error) {
+      this.errors.set(id, error instanceof Error ? error.message : String(error))
+      this.publish()
+    } finally {
+      if (this.disposed) return
+      if (!usesSelectionFallback) return
+      const state = this.sessions.list.getSnapshot()
+      if (previous !== undefined && state.byId[previous] !== undefined) {
+        if (previous !== id) this.sessions.open(previous)
+      } else {
+        this.sessions.clear()
+      }
+      this.publish()
+    }
+  }
+
+  private waitForSessionOpen(session: SessionFace): Promise<void> {
+    const snapshotState = (): string | undefined => session.getSnapshot()?.openState as string | undefined
+    if (snapshotState() === 'open') return Promise.resolve()
+    return new Promise((resolve, reject) => {
+      let settled = false
+      let dispose = (): void => {}
+      let timeout = 0
+      const finish = (error?: Error): void => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timeout)
+        dispose()
+        if (error === undefined) resolve()
+        else reject(error)
+      }
+      timeout = window.setTimeout(() => { finish(new Error('session history hydration timed out')) }, 10000)
+      dispose = session.subscribe(() => {
+        const state = snapshotState()
+        if (state === 'open') finish()
+        else if (state === 'error') finish(new Error('session history is unavailable'))
+      })
+      const state = snapshotState()
+      if (state === 'open') finish()
+      else if (state === 'error') finish(new Error('session history is unavailable'))
+    })
   }
 
   private publish(): void {
     const list = this.sessions.list.getSnapshot()
     const summaries = this.visibleSummaries()
     const graph = buildSessionGraph(summaries)
-    for (const node of graph.nodes) this.deriveBranchTitle(node.id, undefined, false)
+      for (const node of graph.nodes) this.deriveBranchTitle(node.id, undefined, false)
     const nodes: CanvasNodeSnapshot[] = graph.nodes.map(node => {
       const session = this.sessions.binding(node.id)?.session
-      const boundary = session === undefined ? undefined : latestStableBoundary(session.getSnapshot())
+      const boundary = session === undefined ? undefined : latestStableBoundary(this.snapshotFor(node.id, session))
       const derivedTitle = this.derivedBranchTitles.get(node.id)
       return {
         ...node,
@@ -729,20 +859,19 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       const presentation = this.presentations.get(node.id)
       if (presentation !== undefined && !presentation.branchContinued) {
         let presentationChanged = false
-        const snapshot = session?.getSnapshot()
+        const snapshot = session === undefined ? undefined : this.snapshotFor(node.id, session) as { openState?: string; running?: boolean; turnEnds?: Map<number, number>; chat?: { legacy?: { turnEnds?: Map<number, number> } } }
         const inputPhase = input?.state?.getSnapshot()?.phase
+        const turnEnds = snapshot?.turnEnds ?? snapshot?.chat?.legacy?.turnEnds
         if (!presentation.branchBoundaryResolved
           && snapshot?.openState === 'open'
           && snapshot.running === false
-          && snapshot.chat !== undefined
-          && snapshot.chat.nodes !== undefined
-          && snapshot.turnEnds !== undefined
+          && turnEnds !== undefined
           && (inputPhase === undefined || inputPhase === 'plain')) {
           const inheritedAnchors = [
-            ...snapshot.chat.nodes.values().map(node => node.anchorSeq),
-            ...snapshot.turnEnds.values(),
-          ]
-          presentation.branchAtSeq = Math.max(presentation.branchAtSeq, ...inheritedAnchors)
+            ...readChatTranscript({ ...snapshot, chat: this.chatSnapshotFor(node.id) }).map(node => node.anchorSeq ?? node.seq),
+            ...turnEnds.values(),
+          ].filter((seq): seq is number => typeof seq === 'number' && Number.isFinite(seq))
+          if (inheritedAnchors.length > 0) presentation.branchAtSeq = Math.max(presentation.branchAtSeq, ...inheritedAnchors)
           presentation.branchBoundaryResolved = true
           presentationChanged = true
         }
@@ -755,6 +884,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
       return {
         ...node,
         session,
+        ...(session === undefined ? {} : { chatSnapshot: this.chatSnapshotFor(node.id) }),
         input,
         inputState: input?.state?.getSnapshot(),
         ...(presentation ?? {}),
@@ -802,7 +932,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     const session = this.sessions.binding(id)?.session
     if (session === undefined) return
     const boundary = this.presentations.get(id)?.branchAtSeq ?? this.branchBoundaries.get(id)
-    const source = prompt ?? (boundary === undefined ? undefined : firstUserPromptAfter(session, boundary))
+    const source = prompt ?? (boundary === undefined ? undefined : firstUserPromptAfter(this.snapshotFor(id, session), boundary))
     if (source === undefined) return
     const title = titleFromPrompt(source)
     if (title.length === 0) return
@@ -833,6 +963,7 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     this.selectedSessionId = id
     this.mode = 'canvas'
     if (!this.focusWhenVisible(id)) this.pendingFocusId = id
+    this.queueDetachedHydration()
   }
 
   private hasBranchActivity(
@@ -843,14 +974,12 @@ export class LoomChatController implements HostObservable<LoomChatSnapshot> {
     if (session?.getSnapshot()?.running === true) return true
     const inputPhase = input?.state?.getSnapshot()?.phase
     if (inputPhase !== undefined && inputPhase !== 'plain') return true
-    const snapshot = session?.getSnapshot()
+    const snapshot = session === undefined ? undefined : this.snapshotFor(session.sessionId, session)
     if (snapshot === undefined) return false
-    const chat = snapshot.chat
-    if (chat === undefined || !Array.isArray(chat.order) || chat.nodes === undefined) return false
-    return chat.order.some(key => {
-      const node = chat.nodes.get(key)
-      return node !== undefined
-        && node.anchorSeq > branchAtSeq
+    return readChatTranscript(snapshot).some(node => {
+      const seq = node.anchorSeq ?? node.seq
+      return seq !== undefined
+        && seq > branchAtSeq
         && (node.kind === 'user' || node.kind === 'steering' || node.kind === 'command')
     })
   }

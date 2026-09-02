@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { inject as clientInject } from '../src/client/index.js'
 
 interface PackageManifest {
   files?: string[]
@@ -19,6 +20,11 @@ interface PackageManifest {
   scripts?: {
     'pack:verify'?: string
     prepare?: string
+  }
+  dsh?: {
+    client?: {
+      inject?: string[]
+    }
   }
 }
 
@@ -50,7 +56,39 @@ describe('published package manifest', () => {
     const manifest = await readJson<PackageManifest>('package.json')
 
     expect(manifest.scripts?.prepare).toBe('pnpm run build')
-    expect(manifest.scripts?.['pack:verify']).toBe('pnpm pack --pack-destination ./.artifacts')
+    expect(manifest.scripts?.['pack:verify']).toBe('pnpm pack --pack-destination ./.artifacts && node scripts/verify-pack.mjs')
+  })
+
+  it('keeps browser injection on published package names only', async () => {
+    const manifest = await readJson<PackageManifest>('package.json')
+    const inject = manifest.dsh?.client?.inject ?? []
+
+    expect(inject.length).toBeGreaterThan(0)
+    expect(inject.every(name => /^@deepseek-ai\//u.test(name))).toBe(true)
+    expect(inject).toEqual(expect.arrayContaining([
+    '@deepseek-ai/dsh-api-session-controller',
+    '@deepseek-ai/dsh-api-remotes',
+    '@deepseek-ai/dsh-api-workspace-controller',
+    '@deepseek-ai/dsh-client-connection',
+    '@deepseek-ai/dsh-client-ui-commands',
+      '@deepseek-ai/dsh-client-ui-chat',
+      '@deepseek-ai/dsh-client-ui-conversation',
+      '@deepseek-ai/dsh-client-ui-input-trigger',
+      '@deepseek-ai/dsh-client-ui-layout',
+      '@deepseek-ai/dsh-client-ui-model-selection',
+    '@deepseek-ai/dsh-client-ui-renderer',
+    '@deepseek-ai/dsh-client-ui-settings',
+    '@deepseek-ai/dsh-client-ui-session',
+    '@deepseek-ai/dsh-client-ui-sidebar',
+    '@deepseek-ai/dsh-client-ui-theme',
+    '@deepseek-ai/dsh-client-ui-workspace',
+    ]))
+    expect(inject).not.toContain('@deepseek-ai/dsh-client-runtime')
+    expect(JSON.stringify(manifest)).not.toMatch(/(?:file:|link:|deepseek-harness)/u)
+  })
+
+  it('declares the remote faces required by model directory resolution', () => {
+    expect(clientInject).toEqual(expect.arrayContaining(['remote', 'remote.session']))
   })
 
   it('ships README assets referenced by the npm package page', async () => {

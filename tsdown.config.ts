@@ -8,18 +8,29 @@ const PLUGIN_ID = 'dsh-loom-chat'
 const CSS_VIRTUAL_PREFIX = '\0dsh-loom-chat-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
 const EXTERNALS = [
-  '@deepseek-ai/dsh-client-runtime',
+  '@deepseek-ai/dsh-api-session-controller',
+  '@deepseek-ai/dsh-api-workspace-controller',
+  '@deepseek-ai/dsh-client-connection',
+  '@deepseek-ai/dsh-client-store',
+  '@deepseek-ai/dsh-client-ui-commands',
+  '@deepseek-ai/dsh-client-ui-chat',
+  '@deepseek-ai/dsh-client-ui-renderer',
+  '@deepseek-ai/dsh-client-ui-session',
+  '@deepseek-ai/dsh-client-ui-settings',
+  '@deepseek-ai/dsh-client-ui-sidebar',
+  '@deepseek-ai/dsh-client-ui-theme',
+  '@deepseek-ai/dsh-client-ui-workspace',
   '@deepseek-ai/dsh-api-remotes',
   '@deepseek-ai/dsh-client-ui-layout',
   '@deepseek-ai/dsh-client-ui-primitives',
   '@deepseek-ai/dsh-client-ui-conversation',
-  '@deepseek-ai/dsh-client-ui-attachment',
   '@deepseek-ai/dsh-client-ui-input-trigger',
   '@deepseek-ai/dsh-client-ui-model-selection',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-locale',
   'react',
   'react/jsx-runtime',
+  'react-dom',
 ]
 
 /**
@@ -63,8 +74,24 @@ export default defineConfig({
   dts: false,
   sourcemap: true,
   clean: false,
+  // Lexical's default Node export uses top-level await. The Harness browser
+  // bundle selects its synchronous production/browser export instead.
+  inputOptions: {
+    resolve: {
+      conditionNames: ['production', 'browser', 'import', 'module', 'default'],
+    },
+  },
   deps: {
     neverBundle: EXTERNALS,
+    // The latest Harness chat rail uses the runtime SessionSeq brand from
+    // this package. Keep it inside this browser bundle: it is not a module
+    // table row supplied by the plugin manifest.
+    alwaysBundle: (specifier: string) => specifier === '@deepseek-ai/dsh-session'
+      || specifier === '@deepseek-ai/dsh-brand'
+      || specifier === 'lexical'
+      || specifier === 'clsx'
+      || specifier.startsWith('@lexical/')
+      || specifier.startsWith('@deepseek-ai/dsh-session/'),
   },
   plugins: [{
     name: 'dsh-loom-chat-css-text',
