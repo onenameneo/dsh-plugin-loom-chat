@@ -94,6 +94,6 @@ describe('published package manifest', () => {
   it('ships README assets referenced by the npm package page', async () => {
     const manifest = await readJson<PackageManifest>('package.json')
 
-    expect(manifest.files).toContain('assetes')
+    expect(manifest.files).toContain('assets')
   })
 })

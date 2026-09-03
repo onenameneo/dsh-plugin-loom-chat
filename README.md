@@ -5,6 +5,10 @@ Loom Chat is a DSH Web client plugin that turns linear ordinary sessions into a 
 [![npm version](https://img.shields.io/npm/v/dsh-loom-chat.svg)](https://www.npmjs.com/package/dsh-loom-chat)
 [中文说明](README.zh.md) · [GitHub repository](https://github.com/onenameneo/dsh-plugin-loom-chat)
 
+## Loom project
+
+[Loom](https://github.com/onenameneo/Loom) is a local Agent workbench that turns AI conversations into an explorable space for thinking. It combines streamed conversations with a branching canvas, project-based files and sessions, deliberate context management, Agent tools, MCP servers, long-term memory, and local Agent activity tracking. A question can be split into multiple lines of investigation, arranged as a thought graph, and continued with the right context on each branch. Loom is designed for research, learning, writing, coding, and other work that benefits from sustained thinking and parallel exploration. This plugin brings Loom's branching-canvas experience to DSH Web as a lightweight companion.
+
 ## Install
 
 Loom Chat is available as an npm package with prebuilt browser code. Install it without a tag to receive the current `latest` release:
@@ -50,11 +54,11 @@ It is designed for exploring several directions around one question: keep the ma
 
 Open Loom from the native DSH session header to pan and zoom across the canvas. Use the branch action on any session window to continue exploring from that context. Every branch keeps its own history, draft, and runtime state, so several lines of thought can move forward in parallel.
 
-![Opening Loom from a DSH session](assetes/intro_0.gif)
+![Opening Loom from a DSH session](assets/intro_0.gif)
 
 _Opening the Loom canvas from a native session._
 
-![Parallel sessions on the Loom canvas](assetes/intro_1.png)
+![Parallel sessions on the Loom canvas](assets/intro_1.png)
 
 _Viewing related but independent conversations together on one canvas._
 

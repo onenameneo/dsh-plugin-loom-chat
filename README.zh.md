@@ -5,6 +5,10 @@ Loom Chat 是一个 DSH Web 客户端插件，把线性的普通会话转换为�
 [![npm version](https://img.shields.io/npm/v/dsh-loom-chat.svg)](https://www.npmjs.com/package/dsh-loom-chat)
 [English README](README.md) · [GitHub 仓库](https://github.com/onenameneo/dsh-plugin-loom-chat)
 
+## Loom 项目
+
+[Loom](https://github.com/onenameneo/Loom) 是一个把 AI 对话组织成可探索思考空间的本地 Agent 工作台。它将流式对话、分支画布、基于项目的文件与会话、精细的上下文管理、Agent 工具、MCP Server、长期记忆和本地 Agent 活动观察结合在一起。用户可以把一个问题拆分为多条探索路径，将它们整理成思考图，并在每个分支中携带恰当的上下文继续推进。Loom 适合研究、学习、写作、编程，以及任何需要持续思考和并行探索的工作；本插件则以轻量的方式，将 Loom 的分支画布体验带到 DSH Web 中。
+
 ## 安装
 
 Loom Chat 已通过 npm 分发，npm 包包含预构建的浏览器代码。不带标签安装即可获取当前 `latest` 版本：
@@ -50,11 +54,11 @@ dsh plugin --profile web remove dsh-loom-chat
 
 从 DSH 原生会话头部进入 Loom 后，可以在画布中平移和缩放视图；点击任意会话窗口的分支按钮，就能从对应的上下文继续探索新的方向。每条分支都有独立的历史、输入和运行状态，可以同时推进多个思路。
 
-![从 DSH 会话进入 Loom 的操作演示](assetes/intro_0.gif)
+![从 DSH 会话进入 Loom 的操作演示](assets/intro_0.gif)
 
 _从原生会话打开 Loom 画布。_
 
-![Loom 画布中的多会话并行探索](assetes/intro_1.png)
+![Loom 画布中的多会话并行探索](assets/intro_1.png)
 
 _在同一张画布上查看多个相互关联、又彼此独立的会话。_
 
