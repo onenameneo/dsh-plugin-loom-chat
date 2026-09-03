@@ -7,21 +7,12 @@ Loom Chat is a DSH Web client plugin that turns linear ordinary sessions into a 
 
 ## Install
 
-Loom Chat is available as an npm package with prebuilt browser code. Use the release channel that matches the version you want:
+Loom Chat is available as an npm package with prebuilt browser code. Install it without a tag to receive the current `latest` release:
 
-### Stable release
+### Latest release
 
 ```sh
 dsh plugin --profile web add dsh-loom-chat
-dsh web
-```
-
-### Prerelease
-
-The `next` tag is for release candidates and other prereleases:
-
-```sh
-dsh plugin --profile web add dsh-loom-chat@next
 dsh web
 ```
 
@@ -129,7 +120,7 @@ DSH_HOME=/tmp/dsh-loom-chat-profile \
 
 ## Publishing
 
-Maintainers can publish a prerelease to the `next` channel or a stable release to `latest`:
+Maintainers publish releases to the `latest` channel:
 
 ```sh
 npm login
@@ -138,8 +129,7 @@ pnpm test
 pnpm typecheck
 pnpm build
 pnpm pack --dry-run
-pnpm publish --tag next       # release candidate
-# pnpm publish --tag latest   # stable release
+pnpm publish --tag latest
 ```
 
 The `prepare` script builds `lib/` before publishing, and `files` limits the published package to the runtime, type declarations, DSH patch, documentation, and license.

@@ -7,21 +7,12 @@ Loom Chat 是一个 DSH Web 客户端插件，把线性的普通会话转换为�
 
 ## 安装
 
-Loom Chat 已通过 npm 分发，npm 包包含预构建的浏览器代码。根据需要选择稳定版或预发布版：
+Loom Chat 已通过 npm 分发，npm 包包含预构建的浏览器代码。不带标签安装即可获取当前 `latest` 版本：
 
-### 稳定版
+### 最新版
 
 ```sh
 dsh plugin --profile web add dsh-loom-chat
-dsh web
-```
-
-### 预发布版
-
-`next` 标签用于候选版本和其他预发布版本：
-
-```sh
-dsh plugin --profile web add dsh-loom-chat@next
 dsh web
 ```
 
@@ -129,7 +120,7 @@ DSH_HOME=/tmp/dsh-loom-chat-profile \
 
 ## 发布 npm
 
-维护者可以将候选版本发布到 `next`，将稳定版本发布到 `latest`：
+维护者将发布版本直接发布到 `latest`：
 
 ```sh
 npm login
@@ -138,8 +129,7 @@ pnpm test
 pnpm typecheck
 pnpm build
 pnpm pack --dry-run
-pnpm publish --tag next       # 候选版本
-# pnpm publish --tag latest   # 稳定版本
+pnpm publish --tag latest
 ```
 
 `prepare` 脚本会在发布前构建 `lib/`；`files` 字段会限制最终包只包含运行时代码、类型声明、DSH patch、文档和许可证。
