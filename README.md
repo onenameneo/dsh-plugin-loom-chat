@@ -3,6 +3,9 @@
 Loom Chat is a DSH Web client plugin that turns linear ordinary sessions into a pannable, zoomable Loom-style canvas for parallel exploration.
 
 [![npm version](https://img.shields.io/npm/v/dsh-loom-chat.svg)](https://www.npmjs.com/package/dsh-loom-chat)
+[![CI](https://github.com/onenameneo/dsh-plugin-loom-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/onenameneo/dsh-plugin-loom-chat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![DSH Web Plugin](https://img.shields.io/badge/DSH-Web%20Plugin-0ea5e9.svg)
 [中文说明](README.zh.md) · [GitHub repository](https://github.com/onenameneo/dsh-plugin-loom-chat)
 
 ## Loom project
@@ -98,6 +101,17 @@ The plugin does not modify DSH's native sidebar, `ui-workspace`, or the main con
 
 Canvas deliberately does not promise the host's full Composer inside every window. Attachments, slash commands, model selection, Plan controls, and other host-specific controls remain available after opening a window in native single-session mode.
 
+## Privacy & permissions
+
+Based on its current runtime code, Loom Chat:
+
+- does not directly send data to third-party servers;
+- does not read API keys or environment variables;
+- does not execute shell commands;
+- uses DSH's public session, runtime, conversation, workspace, and UI APIs;
+- stores Loom branch presentation metadata, including derived titles and boundaries, in browser `localStorage`;
+- can open, fork, rename, cancel, and archive DSH sessions when requested through the plugin UI.
+
 ## Compatibility
 
 - DSH Web profile with the public session, runtime, conversation, workspace, and UI slot APIs.
@@ -132,7 +146,7 @@ npm whoami
 pnpm test
 pnpm typecheck
 pnpm build
-pnpm pack --dry-run
+pnpm run pack:verify
 pnpm publish --tag latest
 ```
 

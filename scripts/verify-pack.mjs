@@ -16,6 +16,22 @@ const entries = execFileSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' })
   .split('\n')
   .filter(Boolean)
 
+function collectExportTargets(value) {
+  if (typeof value === 'string') return [value]
+  if (value === null || typeof value !== 'object') return []
+
+  return Object.values(value).flatMap(collectExportTargets)
+}
+
+function exportTargetPattern(target) {
+  if (!target.startsWith('./')) {
+    throw new Error(`Package export target must be relative: ${target}`)
+  }
+
+  const escaped = target.slice(2).replace(/[|\\{}()[\]^$+?.]/gu, '\\$&').replaceAll('*', '.+')
+  return new RegExp(`^package/${escaped}$`, 'u')
+}
+
 const required = [
   'package/package.json',
   'package/lib/index.js',
@@ -40,6 +56,15 @@ if (packedManifest.name !== packageManifest.name || packedManifest.version !== p
 }
 if (packedManifest.exports?.['./client']?.default !== './lib/client.js') {
   throw new Error('Packed package is missing the public ./client entry point')
+}
+
+const exportTargets = collectExportTargets(packedManifest.exports)
+const missingExportTargets = exportTargets.filter(target => {
+  const pattern = exportTargetPattern(target)
+  return !entries.some(entry => pattern.test(entry))
+})
+if (missingExportTargets.length > 0) {
+  throw new Error(`Packed package exports point to missing tarball entries: ${missingExportTargets.join(', ')}`)
 }
 
 console.log(`Pack verification passed: ${tarball}`)

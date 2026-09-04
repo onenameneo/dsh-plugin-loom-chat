@@ -42,7 +42,6 @@ describe('plugin architecture boundary', () => {
       'ISession.open',
       'ISessions.infoOf',
       'variant: \'canvas\'',
-      'deepseek-harness',
     ]
     const violations = contents.flatMap(({ file, text }) => forbidden
       .filter(term => text.includes(term))

@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest'
 import { inject as clientInject } from '../src/client/index.js'
 
 interface PackageManifest {
+  author?: string
   files?: string[]
+  keywords?: string[]
   types?: string
   exports?: {
     '.': {
@@ -26,6 +28,13 @@ interface PackageManifest {
       inject?: string[]
     }
   }
+}
+
+function collectExportTargets(value: unknown): string[] {
+  if (typeof value === 'string') return [value]
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return []
+
+  return Object.values(value).flatMap(collectExportTargets)
 }
 
 interface BuildConfig {
@@ -50,6 +59,34 @@ describe('published package manifest', () => {
     expect(manifest.exports?.['./client']?.types).toBe('./lib/types/client/index.d.ts')
     expect(buildConfig.compilerOptions?.outDir).toBe('lib')
     expect(buildConfig.compilerOptions?.declarationDir).toBe('lib/types')
+  })
+
+  it('keeps every public export target inside the published package boundary', async () => {
+    const manifest = await readJson<PackageManifest>('package.json')
+    const targets = collectExportTargets(manifest.exports)
+
+    expect(targets.length).toBeGreaterThan(0)
+    expect(targets.every(target => target.startsWith('./'))).toBe(true)
+    expect(targets.some(target => /(?:^|\/)(?:src|openspec|node_modules)(?:\/|$)/u.test(target))).toBe(false)
+  })
+
+  it('declares useful package discovery metadata', async () => {
+    const manifest = await readJson<PackageManifest>('package.json')
+
+    expect(manifest.author).toBe('onenameneo')
+    expect(manifest.keywords).toEqual(expect.arrayContaining([
+      'deepseek',
+      'deepseek-harness',
+      'dsh',
+      'dsh-plugin',
+      'cordis',
+      'chat',
+      'chat-ui',
+      'conversation',
+      'branching',
+      'canvas',
+      'agent',
+    ]))
   })
 
   it('builds Git dependencies before the loader resolves their published entrypoints', async () => {
@@ -84,7 +121,8 @@ describe('published package manifest', () => {
     '@deepseek-ai/dsh-client-ui-workspace',
     ]))
     expect(inject).not.toContain('@deepseek-ai/dsh-client-runtime')
-    expect(JSON.stringify(manifest)).not.toMatch(/(?:file:|link:|deepseek-harness)/u)
+    const manifestWithoutKeywords = { ...manifest, keywords: undefined }
+    expect(JSON.stringify(manifestWithoutKeywords)).not.toMatch(/(?:file:|link:|deepseek-harness)/u)
   })
 
   it('declares the remote faces required by model directory resolution', () => {

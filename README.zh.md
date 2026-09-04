@@ -3,6 +3,9 @@
 Loom Chat 是一个 DSH Web 客户端插件，把线性的普通会话转换为可平移、缩放和并行操作的 Loom 风格无限画布。
 
 [![npm version](https://img.shields.io/npm/v/dsh-loom-chat.svg)](https://www.npmjs.com/package/dsh-loom-chat)
+[![CI](https://github.com/onenameneo/dsh-plugin-loom-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/onenameneo/dsh-plugin-loom-chat/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![DSH Web Plugin](https://img.shields.io/badge/DSH-Web%20Plugin-0ea5e9.svg)
 [English README](README.md) · [GitHub 仓库](https://github.com/onenameneo/dsh-plugin-loom-chat)
 
 ## Loom 项目
@@ -98,6 +101,17 @@ Canvas 窗口使用 DSH 公开的 session face 和每会话 input face。它是�
 
 Canvas 不承诺在每个窗口内复刻宿主的完整 Composer。附件、斜杠命令、模型选择、Plan 等宿主专属控件，请打开窗口进入原生单会话模式使用。
 
+## 隐私与权限
+
+基于当前运行时代码，Loom Chat：
+
+- 不会直接向第三方服务器发送数据；
+- 不读取 API key 或环境变量；
+- 不执行 shell 命令；
+- 使用 DSH 公开的 session、runtime、conversation、workspace 和 UI API；
+- 使用浏览器 `localStorage` 保存 Loom 分支展示元数据，包括派生标题和分支边界；
+- 用户通过插件界面请求时，可以打开、fork、改名、取消和归档 DSH 会话。
+
 ## 兼容性
 
 - 需要使用 DSH Web profile，以及公开的 session、runtime、conversation、workspace 和 UI slot 能力。
@@ -132,7 +146,7 @@ npm whoami
 pnpm test
 pnpm typecheck
 pnpm build
-pnpm pack --dry-run
+pnpm run pack:verify
 pnpm publish --tag latest
 ```
 

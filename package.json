@@ -2,6 +2,20 @@
   "name": "dsh-loom-chat",
   "description": "Interact with branched DSH sessions as live windows on a Loom-style canvas",
   "version": "0.1.0-rc.3",
+  "author": "onenameneo",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "chat",
+    "chat-ui",
+    "conversation",
+    "branching",
+    "canvas",
+    "agent"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/onenameneo/dsh-plugin-loom-chat.git"
@@ -30,7 +44,6 @@
       "default": "./lib/client.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./src/*": "./src/*",
     "./package.json": "./package.json"
   },
   "dsh": {
